@@ -14,11 +14,11 @@ pub enum TokenKind {
 }
 
 pub struct Token {
-    kind: TokenKind,
+    pub kind: TokenKind,
     next: Option<Box<Token>>,
     val: Option<i32>,
     str: String,
-    loc: usize, // token location in input
+    pub loc: usize, // token location in input
 }
 
 impl Token {
@@ -33,12 +33,12 @@ impl Token {
     }
 }
 
-fn error(msg: &str) -> ! {
+pub fn error(msg: &str) -> ! {
     eprintln!("Error: {}", msg);
     process::exit(1);
 }
 
-fn error_at(loc: usize, msg: &str) -> ! {
+pub fn error_at(loc: usize, msg: &str) -> ! {
     if let Some(ref user_input) = *USER_INPUT.write().unwrap() {
         let input = &user_input;
         eprintln!("{}", input);
@@ -82,6 +82,7 @@ pub fn expect_number(token: &mut Option<Box<Token>>) -> i32 {
     }
 }
 
+#[allow(dead_code)]
 pub fn at_eof(token: &Option<Box<Token>>) -> bool {
     if let Some(token) = token {
         matches!(token.kind, TokenKind::TkEof)
@@ -109,7 +110,7 @@ pub fn tokenizer(input: &str) -> Option<Box<Token>> {
             continue;
         }
 
-        if c == '+' || c == '-' {
+        if c == '+' || c == '-' || c == '*' || c == '/' || c == '(' || c == ')' {
             cur = new_token(
                 TokenKind::TkReserved,
                 cur,
