@@ -58,20 +58,20 @@ pub fn expr(token: &mut Option<Box<tokenizer::Token>>) -> Node {
 }
 
 fn mul(token: &mut Option<Box<tokenizer::Token>>) -> Node {
-    let mut node = primary(token);
+    let mut node = unary(token);
 
     loop {
         if tokenizer::consume('*', &mut token.borrow_mut()) {
             node = new_node(
                 NodeKind::NdMul,
                 Some(Box::new(node)),
-                Some(Box::new(primary(token))),
+                Some(Box::new(unary(token))),
             );
         } else if tokenizer::consume('/', &mut token.borrow_mut()) {
             node = new_node(
                 NodeKind::NdDiv,
                 Some(Box::new(node)),
-                Some(Box::new(primary(token))),
+                Some(Box::new(unary(token))),
             );
         } else {
             return node;
@@ -94,6 +94,20 @@ fn primary(token: &mut Option<Box<tokenizer::Token>>) -> Node {
     } else {
         tokenizer::error("unexpected error");
     }
+}
+
+fn unary(token: &mut Option<Box<tokenizer::Token>>) -> Node {
+    if tokenizer::consume('+', &mut token.borrow_mut()) {
+        return primary(token);
+    }
+    if tokenizer::consume('-', &mut token.borrow_mut()) {
+        return new_node(
+            NodeKind::NdSub,
+            Some(Box::new(new_node_num(0))),
+            Some(Box::new(primary(token))),
+        );
+    }
+    primary(token)
 }
 
 pub fn gen(node: Node) {

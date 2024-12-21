@@ -3,7 +3,7 @@ assert() {
 	expected="$1"
 	input="$2"
 
-	cargo run "$input" > tmp.s
+	cargo run -- "$input" > tmp.s
 	cc -o tmp tmp.s
 	./tmp
 	actual="$?"
@@ -23,6 +23,7 @@ assert 41 " 12 + 34 - 5 "
 assert 47 '5+6 * 7'
 assert 15 '5*(9-6)'
 assert 4 '(3+ 5)/2'
+assert 10 '-10+20'
 
 echo OK
 
