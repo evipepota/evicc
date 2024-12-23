@@ -7,6 +7,7 @@ enum NodeKind {
     NdSub, // -
     NdMul, // *
     NdDiv, // /
+    NdNeg, // unary -
     NdEq,  // ==
     NdNe,  // !=
     NdGt,  // >
@@ -168,7 +169,7 @@ fn unary(token: &mut Option<Box<tokenizer::Token>>) -> Node {
     }
     if tokenizer::consume("-", &mut token.borrow_mut()) {
         return new_node(
-            NodeKind::NdSub,
+            NodeKind::NdNeg,
             Some(Box::new(new_node_num(0))),
             Some(Box::new(primary(token))),
         );
