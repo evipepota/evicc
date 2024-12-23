@@ -49,10 +49,10 @@ pub fn error_at(loc: usize, msg: &str) -> ! {
     process::exit(1);
 }
 
-pub fn consume(op: char, token: &mut Option<Box<Token>>) -> bool {
+pub fn consume(op: &str, token: &mut Option<Box<Token>>) -> bool {
     if let Some(current) = token {
         if let TokenKind::TkReserved = current.kind {
-            if current.str.chars().next() == Some(op) {
+            if current.str == op {
                 *token = current.next.take();
                 return true;
             }
@@ -61,7 +61,7 @@ pub fn consume(op: char, token: &mut Option<Box<Token>>) -> bool {
     false
 }
 
-pub fn expect(op: char, token: &mut Option<Box<Token>>) {
+pub fn expect(op: &str, token: &mut Option<Box<Token>>) {
     if !consume(op, token) {
         if let Some(current) = token {
             error_at(current.loc, &format!("expected token is '{}'", op));
@@ -108,6 +108,97 @@ pub fn tokenizer(input: &str) -> Option<Box<Token>> {
         if c.is_whitespace() {
             chars.next();
             continue;
+        }
+
+        if c == '=' {
+            // consume "==" or "="
+            chars.next();
+            if let Some(&c) = chars.peek() {
+                if c == '=' {
+                    cur = new_token(
+                        TokenKind::TkReserved,
+                        cur,
+                        "==".to_string(),
+                        input.len() - chars.clone().count(),
+                    );
+                    chars.next();
+                    continue;
+                } else {
+                    cur = new_token(
+                        TokenKind::TkReserved,
+                        cur,
+                        "=".to_string(),
+                        input.len() - chars.clone().count(),
+                    );
+                    continue;
+                }
+            }
+        }
+        if c == '!' {
+            // consume "!="
+            chars.next();
+            if let Some(&c) = chars.peek() {
+                if c == '=' {
+                    cur = new_token(
+                        TokenKind::TkReserved,
+                        cur,
+                        "!=".to_string(),
+                        input.len() - chars.clone().count(),
+                    );
+                    chars.next();
+                    continue;
+                } else {
+                    error_at(input.len() - chars.clone().count(), "invalid token");
+                }
+            }
+        }
+        if c == '<' {
+            // consume "<=" or "<"
+            chars.next();
+            if let Some(&c) = chars.peek() {
+                if c == '=' {
+                    cur = new_token(
+                        TokenKind::TkReserved,
+                        cur,
+                        "<=".to_string(),
+                        input.len() - chars.clone().count(),
+                    );
+                    chars.next();
+                    continue;
+                } else {
+                    cur = new_token(
+                        TokenKind::TkReserved,
+                        cur,
+                        "<".to_string(),
+                        input.len() - chars.clone().count(),
+                    );
+                    continue;
+                }
+            }
+        }
+        if c == '>' {
+            // consume ">=" or ">"
+            chars.next();
+            if let Some(&c) = chars.peek() {
+                if c == '=' {
+                    cur = new_token(
+                        TokenKind::TkReserved,
+                        cur,
+                        ">=".to_string(),
+                        input.len() - chars.clone().count(),
+                    );
+                    chars.next();
+                    continue;
+                } else {
+                    cur = new_token(
+                        TokenKind::TkReserved,
+                        cur,
+                        ">".to_string(),
+                        input.len() - chars.clone().count(),
+                    );
+                    continue;
+                }
+            }
         }
 
         if c == '+' || c == '-' || c == '*' || c == '/' || c == '(' || c == ')' {
