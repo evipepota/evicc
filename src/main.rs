@@ -16,7 +16,7 @@ fn main() {
 
     let tokens = &args[1][..];
     let token = Rc::new(RefCell::new(tokenizer::tokenizer(tokens)));
-    let code = parser::program(&mut token.borrow_mut());
+    let code = parser::program(&mut token.borrow_mut(), &mut None);
 
     println!(".intel_syntax noprefix");
     println!(".globl main");

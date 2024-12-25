@@ -52,7 +52,24 @@ fn new_node_num(val: i32) -> Node {
     }
 }
 
-fn new_node_lvar(name: String, offset: i32) -> Node {
+fn new_node_lvar(name: String, lvar: &mut Option<Box<tokenizer::LVar>>) -> Node {
+    let tmp = tokenizer::find_lvar(lvar, &name);
+    let offset = if let Some(offset) = tmp {
+        offset
+    } else {
+        if let Some(lvar) = lvar {
+            lvar.offset + 8
+        } else {
+            8
+        }
+    };
+
+    *lvar = Some(Box::new(tokenizer::LVar::new(
+        lvar.take(),
+        name.clone(),
+        offset,
+    )));
+
     Node {
         kind: NodeKind::NdLvar,
         lhs: None,
@@ -63,10 +80,13 @@ fn new_node_lvar(name: String, offset: i32) -> Node {
     }
 }
 
-pub fn program(token: &mut Option<Box<tokenizer::Token>>) -> Vec<Node> {
+pub fn program(
+    token: &mut Option<Box<tokenizer::Token>>,
+    lvar: &mut Option<Box<tokenizer::LVar>>,
+) -> Vec<Node> {
     let mut code = Vec::new();
     loop {
-        let node = stmt(token);
+        let node = stmt(token, lvar);
         code.push(node.clone());
         if let Some(current) = token.borrow_mut() {
             if let tokenizer::TokenKind::TkEof = current.kind {
@@ -76,8 +96,11 @@ pub fn program(token: &mut Option<Box<tokenizer::Token>>) -> Vec<Node> {
     }
 }
 
-fn stmt(token: &mut Option<Box<tokenizer::Token>>) -> Node {
-    let node = expr(token);
+fn stmt(
+    token: &mut Option<Box<tokenizer::Token>>,
+    lvar: &mut Option<Box<tokenizer::LVar>>,
+) -> Node {
+    let node = expr(token, lvar);
     if tokenizer::consume(";", &mut token.borrow_mut()) {
         return node;
     } else {
@@ -89,37 +112,46 @@ fn stmt(token: &mut Option<Box<tokenizer::Token>>) -> Node {
     }
 }
 
-fn expr(token: &mut Option<Box<tokenizer::Token>>) -> Node {
-    return assign(token);
+fn expr(
+    token: &mut Option<Box<tokenizer::Token>>,
+    lvar: &mut Option<Box<tokenizer::LVar>>,
+) -> Node {
+    return assign(token, lvar);
 }
 
-fn assign(token: &mut Option<Box<tokenizer::Token>>) -> Node {
-    let node = equality(token);
+fn assign(
+    token: &mut Option<Box<tokenizer::Token>>,
+    lvar: &mut Option<Box<tokenizer::LVar>>,
+) -> Node {
+    let node = equality(token, lvar);
     if tokenizer::consume("=", &mut token.borrow_mut()) {
         return new_node(
             NodeKind::NdAssign,
             Some(Box::new(node)),
-            Some(Box::new(assign(token))),
+            Some(Box::new(assign(token, lvar))),
         );
     }
     return node;
 }
 
-fn equality(token: &mut Option<Box<tokenizer::Token>>) -> Node {
-    let mut node = relational(token);
+fn equality(
+    token: &mut Option<Box<tokenizer::Token>>,
+    lvar: &mut Option<Box<tokenizer::LVar>>,
+) -> Node {
+    let mut node = relational(token, lvar);
 
     loop {
         if tokenizer::consume("==", &mut token.borrow_mut()) {
             node = new_node(
                 NodeKind::NdEq,
                 Some(Box::new(node)),
-                Some(Box::new(relational(token))),
+                Some(Box::new(relational(token, lvar))),
             );
         } else if tokenizer::consume("!=", &mut token.borrow_mut()) {
             node = new_node(
                 NodeKind::NdNe,
                 Some(Box::new(node)),
-                Some(Box::new(relational(token))),
+                Some(Box::new(relational(token, lvar))),
             );
         } else {
             return node;
@@ -127,33 +159,36 @@ fn equality(token: &mut Option<Box<tokenizer::Token>>) -> Node {
     }
 }
 
-fn relational(token: &mut Option<Box<tokenizer::Token>>) -> Node {
-    let mut node = add(token);
+fn relational(
+    token: &mut Option<Box<tokenizer::Token>>,
+    lvar: &mut Option<Box<tokenizer::LVar>>,
+) -> Node {
+    let mut node = add(token, lvar);
 
     loop {
         if tokenizer::consume("<", &mut token.borrow_mut()) {
             node = new_node(
                 NodeKind::NdLt,
                 Some(Box::new(node)),
-                Some(Box::new(add(token))),
+                Some(Box::new(add(token, lvar))),
             );
         } else if tokenizer::consume("<=", &mut token.borrow_mut()) {
             node = new_node(
                 NodeKind::NdLe,
                 Some(Box::new(node)),
-                Some(Box::new(add(token))),
+                Some(Box::new(add(token, lvar))),
             );
         } else if tokenizer::consume(">", &mut token.borrow_mut()) {
             node = new_node(
                 NodeKind::NdGt,
                 Some(Box::new(node)),
-                Some(Box::new(add(token))),
+                Some(Box::new(add(token, lvar))),
             );
         } else if tokenizer::consume(">=", &mut token.borrow_mut()) {
             node = new_node(
                 NodeKind::NdGe,
                 Some(Box::new(node)),
-                Some(Box::new(add(token))),
+                Some(Box::new(add(token, lvar))),
             );
         } else {
             return node;
@@ -161,21 +196,21 @@ fn relational(token: &mut Option<Box<tokenizer::Token>>) -> Node {
     }
 }
 
-fn add(token: &mut Option<Box<tokenizer::Token>>) -> Node {
-    let mut node = mul(token);
+fn add(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<tokenizer::LVar>>) -> Node {
+    let mut node = mul(token, lvar);
 
     loop {
         if tokenizer::consume("+", &mut token.borrow_mut()) {
             node = new_node(
                 NodeKind::NdAdd,
                 Some(Box::new(node)),
-                Some(Box::new(mul(token))),
+                Some(Box::new(mul(token, lvar))),
             );
         } else if tokenizer::consume("-", &mut token.borrow_mut()) {
             node = new_node(
                 NodeKind::NdSub,
                 Some(Box::new(node)),
-                Some(Box::new(mul(token))),
+                Some(Box::new(mul(token, lvar))),
             );
         } else {
             return node;
@@ -183,21 +218,21 @@ fn add(token: &mut Option<Box<tokenizer::Token>>) -> Node {
     }
 }
 
-fn mul(token: &mut Option<Box<tokenizer::Token>>) -> Node {
-    let mut node = unary(token);
+fn mul(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<tokenizer::LVar>>) -> Node {
+    let mut node = unary(token, lvar);
 
     loop {
         if tokenizer::consume("*", &mut token.borrow_mut()) {
             node = new_node(
                 NodeKind::NdMul,
                 Some(Box::new(node)),
-                Some(Box::new(unary(token))),
+                Some(Box::new(unary(token, lvar))),
             );
         } else if tokenizer::consume("/", &mut token.borrow_mut()) {
             node = new_node(
                 NodeKind::NdDiv,
                 Some(Box::new(node)),
-                Some(Box::new(unary(token))),
+                Some(Box::new(unary(token, lvar))),
             );
         } else {
             return node;
@@ -205,9 +240,12 @@ fn mul(token: &mut Option<Box<tokenizer::Token>>) -> Node {
     }
 }
 
-fn primary(token: &mut Option<Box<tokenizer::Token>>) -> Node {
+fn primary(
+    token: &mut Option<Box<tokenizer::Token>>,
+    lvar: &mut Option<Box<tokenizer::LVar>>,
+) -> Node {
     if tokenizer::consume("(", &mut token.borrow_mut()) {
-        let node = expr(token);
+        let node = expr(token, lvar);
         tokenizer::expect(")", &mut token.borrow_mut());
         return node;
     }
@@ -216,8 +254,7 @@ fn primary(token: &mut Option<Box<tokenizer::Token>>) -> Node {
         if let tokenizer::TokenKind::TkNum = current.kind {
             return new_node_num(tokenizer::expect_number(&mut token.borrow_mut()));
         } else if let tokenizer::TokenKind::TkIdent = current.kind {
-            let offset = (current.str.chars().nth(0).unwrap() as i32 - 'a' as i32 + 1) * 8;
-            return new_node_lvar(tokenizer::expect_ident(&mut token.borrow_mut()), offset);
+            return new_node_lvar(tokenizer::expect_ident(&mut token.borrow_mut()), lvar);
         }
         tokenizer::error("expected number or ident");
     } else {
@@ -225,16 +262,19 @@ fn primary(token: &mut Option<Box<tokenizer::Token>>) -> Node {
     }
 }
 
-fn unary(token: &mut Option<Box<tokenizer::Token>>) -> Node {
+fn unary(
+    token: &mut Option<Box<tokenizer::Token>>,
+    lvar: &mut Option<Box<tokenizer::LVar>>,
+) -> Node {
     if tokenizer::consume("+", &mut token.borrow_mut()) {
-        return primary(token);
+        return primary(token, lvar);
     }
     if tokenizer::consume("-", &mut token.borrow_mut()) {
         return new_node(
             NodeKind::NdNeg,
             Some(Box::new(new_node_num(0))),
-            Some(Box::new(primary(token))),
+            Some(Box::new(primary(token, lvar))),
         );
     }
-    primary(token)
+    primary(token, lvar)
 }

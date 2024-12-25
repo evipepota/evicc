@@ -34,6 +34,18 @@ impl Token {
     }
 }
 
+pub struct LVar {
+    next: Option<Box<LVar>>,
+    name: String,
+    pub offset: i32,
+}
+
+impl LVar {
+    pub fn new(next: Option<Box<LVar>>, name: String, offset: i32) -> Self {
+        LVar { next, name, offset }
+    }
+}
+
 pub fn error(msg: &str) -> ! {
     eprintln!("Error: {}", msg);
     process::exit(1);
@@ -93,6 +105,17 @@ pub fn expect_ident(token: &mut Option<Box<Token>>) -> String {
         error_at(current.loc, "expected ident");
     } else {
         error("unexpected error");
+    }
+}
+
+pub fn find_lvar(lvar: &Option<Box<LVar>>, name: &str) -> Option<i32> {
+    if let Some(current) = lvar {
+        if current.name == name {
+            return Some(current.offset);
+        }
+        find_lvar(&current.next, name)
+    } else {
+        None
     }
 }
 
@@ -257,14 +280,22 @@ pub fn tokenizer(input: &str) -> Option<Box<Token>> {
             continue;
         }
 
-        if 'a' <= c && c <= 'z' {
+        if c.is_alphabetic() {
+            let mut ident_str = String::new();
+            while let Some(&c) = chars.peek() {
+                if c.is_alphanumeric() {
+                    ident_str.push(c);
+                    chars.next();
+                } else {
+                    break;
+                }
+            }
             cur = new_token(
                 TokenKind::TkIdent,
                 cur,
-                c.to_string(),
+                ident_str.to_string(),
                 input.len() - chars.clone().count(),
             );
-            chars.next();
             continue;
         }
 
