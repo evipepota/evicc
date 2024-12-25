@@ -81,7 +81,11 @@ fn stmt(token: &mut Option<Box<tokenizer::Token>>) -> Node {
     if tokenizer::consume(";", &mut token.borrow_mut()) {
         return node;
     } else {
-        tokenizer::error_at(0, "expected ';'");
+        if let Some(current) = token.borrow_mut() {
+            tokenizer::error_at(current.loc, "expected ';'");
+        } else {
+            tokenizer::error("unexpected error");
+        }
     }
 }
 
