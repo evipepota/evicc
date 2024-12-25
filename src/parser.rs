@@ -2,26 +2,32 @@ use std::borrow::BorrowMut;
 
 use crate::tokenizer;
 
-enum NodeKind {
-    NdAdd, // +
-    NdSub, // -
-    NdMul, // *
-    NdDiv, // /
-    NdNeg, // unary -
-    NdEq,  // ==
-    NdNe,  // !=
-    NdGt,  // >
-    NdGe,  // >=
-    NdLt,  // <
-    NdLe,  // <=
-    NdNum, // Integer
+#[derive(Clone)]
+pub enum NodeKind {
+    NdAdd,    // +
+    NdSub,    // -
+    NdMul,    // *
+    NdDiv,    // /
+    NdNeg,    // unary -
+    NdEq,     // ==
+    NdNe,     // !=
+    NdGt,     // >
+    NdGe,     // >=
+    NdLt,     // <
+    NdLe,     // <=
+    NdAssign, // =
+    NdNum,    // Integer
+    NdLvar,   // Local variable
 }
 
+#[derive(Clone)]
 pub struct Node {
-    kind: NodeKind,
-    lhs: Option<Box<Node>>,
-    rhs: Option<Box<Node>>,
-    val: i32,
+    pub kind: NodeKind,
+    pub lhs: Option<Box<Node>>,
+    pub rhs: Option<Box<Node>>,
+    pub name: String,
+    pub val: i32,
+    pub offset: i32,
 }
 
 fn new_node(kind: NodeKind, lhs: Option<Box<Node>>, rhs: Option<Box<Node>>) -> Node {
@@ -29,7 +35,9 @@ fn new_node(kind: NodeKind, lhs: Option<Box<Node>>, rhs: Option<Box<Node>>) -> N
         kind,
         lhs,
         rhs,
+        name: String::new(),
         val: 0,
+        offset: 0,
     }
 }
 
@@ -38,12 +46,59 @@ fn new_node_num(val: i32) -> Node {
         kind: NodeKind::NdNum,
         lhs: None,
         rhs: None,
+        name: String::new(),
         val,
+        offset: 0,
     }
 }
 
-pub fn expr(token: &mut Option<Box<tokenizer::Token>>) -> Node {
-    equality(token)
+fn new_node_lvar(name: String, offset: i32) -> Node {
+    Node {
+        kind: NodeKind::NdLvar,
+        lhs: None,
+        rhs: None,
+        name,
+        val: 0,
+        offset,
+    }
+}
+
+pub fn program(token: &mut Option<Box<tokenizer::Token>>) -> Vec<Node> {
+    let mut code = Vec::new();
+    loop {
+        let node = stmt(token);
+        code.push(node.clone());
+        if let Some(current) = token.borrow_mut() {
+            if let tokenizer::TokenKind::TkEof = current.kind {
+                return code;
+            }
+        }
+    }
+}
+
+fn stmt(token: &mut Option<Box<tokenizer::Token>>) -> Node {
+    let node = expr(token);
+    if tokenizer::consume(";", &mut token.borrow_mut()) {
+        return node;
+    } else {
+        tokenizer::error_at(0, "expected ';'");
+    }
+}
+
+fn expr(token: &mut Option<Box<tokenizer::Token>>) -> Node {
+    return assign(token);
+}
+
+fn assign(token: &mut Option<Box<tokenizer::Token>>) -> Node {
+    let node = equality(token);
+    if tokenizer::consume("=", &mut token.borrow_mut()) {
+        return new_node(
+            NodeKind::NdAssign,
+            Some(Box::new(node)),
+            Some(Box::new(assign(token))),
+        );
+    }
+    return node;
 }
 
 fn equality(token: &mut Option<Box<tokenizer::Token>>) -> Node {
@@ -156,8 +211,11 @@ fn primary(token: &mut Option<Box<tokenizer::Token>>) -> Node {
     if let Some(current) = token {
         if let tokenizer::TokenKind::TkNum = current.kind {
             return new_node_num(tokenizer::expect_number(&mut token.borrow_mut()));
+        } else if let tokenizer::TokenKind::TkIdent = current.kind {
+            let offset = (current.str.chars().nth(0).unwrap() as i32 - 'a' as i32 + 1) * 8;
+            return new_node_lvar(tokenizer::expect_ident(&mut token.borrow_mut()), offset);
         }
-        tokenizer::error_at(current.loc, "expected number");
+        tokenizer::error("expected number or ident");
     } else {
         tokenizer::error("unexpected error");
     }
@@ -175,70 +233,4 @@ fn unary(token: &mut Option<Box<tokenizer::Token>>) -> Node {
         );
     }
     primary(token)
-}
-
-pub fn gen(node: Node) {
-    if let NodeKind::NdNum = node.kind {
-        println!("  push {}", node.val);
-        return;
-    }
-
-    if let Some(lhs) = node.lhs {
-        gen(*lhs);
-    }
-    if let Some(rhs) = node.rhs {
-        gen(*rhs);
-    }
-
-    println!("  pop rdi");
-    println!("  pop rax");
-
-    match node.kind {
-        NodeKind::NdAdd => {
-            println!("  add rax, rdi");
-        }
-        NodeKind::NdSub => {
-            println!("  sub rax, rdi");
-        }
-        NodeKind::NdMul => {
-            println!("  imul rax, rdi");
-        }
-        NodeKind::NdDiv => {
-            println!("  cqo");
-            println!("  idiv rdi");
-        }
-        NodeKind::NdEq => {
-            println!("  cmp rax, rdi");
-            println!("  sete al");
-            println!("  movzb rax, al");
-        }
-        NodeKind::NdNe => {
-            println!("  cmp rax, rdi");
-            println!("  setne al");
-            println!("  movzb rax, al");
-        }
-        NodeKind::NdLt => {
-            println!("  cmp rax, rdi");
-            println!("  setl al");
-            println!("  movzb rax, al");
-        }
-        NodeKind::NdLe => {
-            println!("  cmp rax, rdi");
-            println!("  setle al");
-            println!("  movzb rax, al");
-        }
-        NodeKind::NdGt => {
-            println!("  cmp rdi, rax");
-            println!("  setl al");
-            println!("  movzb rax, al");
-        }
-        NodeKind::NdGe => {
-            println!("  cmp rdi, rax");
-            println!("  setle al");
-            println!("  movzb rax, al");
-        }
-        _ => {}
-    }
-
-    println!("  push rax");
 }

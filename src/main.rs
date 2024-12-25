@@ -3,6 +3,7 @@ use std::env;
 use std::process;
 use std::rc::Rc;
 
+mod codegen;
 mod parser;
 mod tokenizer;
 
@@ -15,14 +16,22 @@ fn main() {
 
     let tokens = &args[1][..];
     let token = Rc::new(RefCell::new(tokenizer::tokenizer(tokens)));
-    let node = parser::expr(&mut token.borrow_mut());
+    let code = parser::program(&mut token.borrow_mut());
 
     println!(".intel_syntax noprefix");
     println!(".globl main");
     println!("main:");
 
-    parser::gen(node);
+    println!("  push rbp");
+    println!("  mov rbp, rsp");
+    println!("  sub rsp, 208");
 
-    println!("  pop rax");
+    for node in code {
+        codegen::gen(node);
+        println!("  pop rax");
+    }
+
+    println!("  mov rsp, rbp");
+    println!("  pop rbp");
     println!("  ret");
 }

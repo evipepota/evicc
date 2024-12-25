@@ -9,6 +9,7 @@ lazy_static! {
 
 pub enum TokenKind {
     TkReserved,
+    TkIdent,
     TkNum,
     TkEof,
 }
@@ -17,7 +18,7 @@ pub struct Token {
     pub kind: TokenKind,
     next: Option<Box<Token>>,
     val: Option<i32>,
-    str: String,
+    pub str: String,
     pub loc: usize, // token location in input
 }
 
@@ -77,6 +78,19 @@ pub fn expect_number(token: &mut Option<Box<Token>>) -> i32 {
             return val;
         }
         error_at(current.loc, "expected number");
+    } else {
+        error("unexpected error");
+    }
+}
+
+pub fn expect_ident(token: &mut Option<Box<Token>>) -> String {
+    if let Some(current) = token {
+        if let TokenKind::TkIdent = current.kind {
+            let val = current.str.clone();
+            *token = current.next.take();
+            return val;
+        }
+        error_at(current.loc, "expected ident");
     } else {
         error("unexpected error");
     }
@@ -212,6 +226,17 @@ pub fn tokenizer(input: &str) -> Option<Box<Token>> {
             continue;
         }
 
+        if c == ';' {
+            cur = new_token(
+                TokenKind::TkReserved,
+                cur,
+                ";".to_string(),
+                input.len() - chars.clone().count(),
+            );
+            chars.next();
+            continue;
+        }
+
         if c.is_digit(10) {
             let mut num_str = String::new();
             while let Some(&c) = chars.peek() {
@@ -229,6 +254,17 @@ pub fn tokenizer(input: &str) -> Option<Box<Token>> {
                 input.len() - chars.clone().count(),
             );
             cur.val = Some(num_str.parse().unwrap());
+            continue;
+        }
+
+        if 'a' <= c && c <= 'z' {
+            cur = new_token(
+                TokenKind::TkIdent,
+                cur,
+                c.to_string(),
+                input.len() - chars.clone().count(),
+            );
+            chars.next();
             continue;
         }
 
