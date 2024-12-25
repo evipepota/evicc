@@ -18,6 +18,7 @@ pub enum NodeKind {
     NdAssign, // =
     NdNum,    // Integer
     NdLvar,   // Local variable
+    NdReturn, // Return
 }
 
 #[derive(Clone)]
@@ -100,6 +101,14 @@ fn stmt(
     token: &mut Option<Box<tokenizer::Token>>,
     lvar: &mut Option<Box<tokenizer::LVar>>,
 ) -> Node {
+    if tokenizer::consume_return(&mut token.borrow_mut()) {
+        let node = new_node(NodeKind::NdReturn, Some(Box::new(expr(token, lvar))), None);
+        if tokenizer::consume(";", &mut token.borrow_mut()) {
+            return node;
+        } else {
+            tokenizer::error_at(token.borrow_mut().as_ref().unwrap().loc, "expected ';'");
+        }
+    }
     let node = expr(token, lvar);
     if tokenizer::consume(";", &mut token.borrow_mut()) {
         return node;

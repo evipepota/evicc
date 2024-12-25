@@ -11,6 +11,7 @@ pub enum TokenKind {
     TkReserved,
     TkIdent,
     TkNum,
+    TkReturn,
     TkEof,
 }
 
@@ -69,6 +70,16 @@ pub fn consume(op: &str, token: &mut Option<Box<Token>>) -> bool {
                 *token = current.next.take();
                 return true;
             }
+        }
+    }
+    false
+}
+
+pub fn consume_return(token: &mut Option<Box<Token>>) -> bool {
+    if let Some(current) = token {
+        if let TokenKind::TkReturn = current.kind {
+            *token = current.next.take();
+            return true;
         }
     }
     false
@@ -289,6 +300,15 @@ pub fn tokenizer(input: &str) -> Option<Box<Token>> {
                 } else {
                     break;
                 }
+            }
+            if ident_str == "return" {
+                cur = new_token(
+                    TokenKind::TkReturn,
+                    cur,
+                    ident_str.to_string(),
+                    input.len() - chars.clone().count(),
+                );
+                continue;
             }
             cur = new_token(
                 TokenKind::TkIdent,
