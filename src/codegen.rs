@@ -62,7 +62,7 @@ pub fn gen(node: Node) {
         NodeKind::NdAdd => {
             println!("  add rax, rdi");
         }
-        NodeKind::NdSub => {
+        NodeKind::NdSub | NodeKind::NdNeg => {
             println!("  sub rax, rdi");
         }
         NodeKind::NdMul => {
