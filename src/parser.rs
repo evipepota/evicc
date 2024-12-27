@@ -22,6 +22,7 @@ pub enum NodeKind {
     NdIf,     // If
     NdElse,   // Else
     NdWhile,  // While
+    NdFor,    // For
 }
 
 #[derive(Clone)]
@@ -138,6 +139,43 @@ fn stmt(
             NodeKind::NdWhile,
             Some(Box::new(cond)),
             Some(Box::new(body)),
+        );
+    } else if tokenizer::consume_kind(tokenizer::TokenKind::TkFor, &mut token.borrow_mut()) {
+        tokenizer::expect("(", &mut token.borrow_mut());
+        let init = if tokenizer::consume(";", token) {
+            None
+        } else {
+            let result = expr(token, lvar);
+            tokenizer::expect(";", &mut token.borrow_mut());
+            Some(result)
+        };
+        let cond = if tokenizer::consume(";", token) {
+            None
+        } else {
+            let result = expr(token, lvar);
+            tokenizer::expect(";", &mut token.borrow_mut());
+            Some(result)
+        };
+        let inc = if tokenizer::consume(")", token) {
+            None
+        } else {
+            let result = expr(token, lvar);
+            tokenizer::expect(")", &mut token.borrow_mut());
+            Some(result)
+        };
+        let body = stmt(token, lvar);
+        return new_node(
+            NodeKind::NdFor,
+            init.map(Box::new),
+            Some(Box::new(new_node(
+                NodeKind::NdFor,
+                cond.map(Box::new),
+                Some(Box::new(new_node(
+                    NodeKind::NdFor,
+                    inc.map(Box::new),
+                    Some(Box::new(body)),
+                ))),
+            ))),
         );
     }
     let node = expr(token, lvar);

@@ -61,5 +61,10 @@ assert 4 'if (0) return 2; else if (0) return 3; else return 4;'
 
 assert 10 'i=0;while(i<10) i=i+1; return i;'
 
+assert 15 'sum=0;for(i=0;i<=5;i=i+1)sum=sum+i; return sum;'
+assert 10 'sum=0;for(i=0;i<5;i=i+1)sum=sum+i; return sum;'
+assert 10 'sum=0;i=0;for(;i<5;i=i+1)sum=sum+i; return sum;'
+assert 5 'i=0;for(;i<5;)i=i+1; return i;'
+
 echo OK
 
