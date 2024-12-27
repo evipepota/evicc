@@ -2,7 +2,7 @@ use std::borrow::BorrowMut;
 
 use crate::tokenizer;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum NodeKind {
     NdAdd,    // +
     NdSub,    // -
@@ -19,6 +19,8 @@ pub enum NodeKind {
     NdNum,    // Integer
     NdLvar,   // Local variable
     NdReturn, // Return
+    NdIf,     // If
+    NdElse,   // Else
 }
 
 #[derive(Clone)]
@@ -101,13 +103,31 @@ fn stmt(
     token: &mut Option<Box<tokenizer::Token>>,
     lvar: &mut Option<Box<tokenizer::LVar>>,
 ) -> Node {
-    if tokenizer::consume_return(&mut token.borrow_mut()) {
+    if tokenizer::consume_kind(tokenizer::TokenKind::TkReturn, &mut token.borrow_mut()) {
         let node = new_node(NodeKind::NdReturn, Some(Box::new(expr(token, lvar))), None);
         if tokenizer::consume(";", &mut token.borrow_mut()) {
             return node;
         } else {
             tokenizer::error_at(token.borrow_mut().as_ref().unwrap().loc, "expected ';'");
         }
+    } else if tokenizer::consume_kind(tokenizer::TokenKind::TkIf, &mut token.borrow_mut()) {
+        tokenizer::expect("(", &mut token.borrow_mut());
+        let cond = expr(token, lvar);
+        tokenizer::expect(")", &mut token.borrow_mut());
+        let then = stmt(token, lvar);
+        if tokenizer::consume_kind(tokenizer::TokenKind::TkElse, &mut token.borrow_mut()) {
+            let els = stmt(token, lvar);
+            return new_node(
+                NodeKind::NdIf,
+                Some(Box::new(cond)),
+                Some(Box::new(new_node(
+                    NodeKind::NdElse,
+                    Some(Box::new(then)),
+                    Some(Box::new(els)),
+                ))),
+            );
+        }
+        return new_node(NodeKind::NdIf, Some(Box::new(cond)), Some(Box::new(then)));
     }
     let node = expr(token, lvar);
     if tokenizer::consume(";", &mut token.borrow_mut()) {

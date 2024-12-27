@@ -45,6 +45,25 @@ pub fn gen(node: Node) {
             println!("  ret");
             return;
         }
+        NodeKind::NdIf => {
+            let label = tokenizer::gen_label();
+            gen(*node.clone().lhs.unwrap());
+            println!("  pop rax");
+            println!("  cmp rax, 0");
+            if let NodeKind::NdElse = node.clone().rhs.unwrap().kind {
+                println!("  je .Lelse{}", label);
+                gen(*node.clone().rhs.unwrap().lhs.unwrap());
+                println!("  jmp .Lend{}", label);
+                println!(".Lelse{}:", label);
+                gen(*node.clone().rhs.unwrap().rhs.unwrap());
+                println!(".Lend{}:", label);
+            } else {
+                println!("  je .Lend{}", label);
+                gen(*node.clone().rhs.unwrap());
+                println!(".Lend{}:", label);
+            }
+            return;
+        }
         _ => {}
     }
 

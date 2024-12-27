@@ -1,4 +1,5 @@
 use std::process;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::RwLock;
 
 use lazy_static::lazy_static;
@@ -7,11 +8,14 @@ lazy_static! {
     static ref USER_INPUT: RwLock<Option<String>> = RwLock::new(None);
 }
 
+#[derive(PartialEq)]
 pub enum TokenKind {
     TkReserved,
     TkIdent,
     TkNum,
     TkReturn,
+    TkIf,
+    TkElse,
     TkEof,
 }
 
@@ -75,9 +79,9 @@ pub fn consume(op: &str, token: &mut Option<Box<Token>>) -> bool {
     false
 }
 
-pub fn consume_return(token: &mut Option<Box<Token>>) -> bool {
+pub fn consume_kind(kind: TokenKind, token: &mut Option<Box<Token>>) -> bool {
     if let Some(current) = token {
-        if let TokenKind::TkReturn = current.kind {
+        if kind == current.kind {
             *token = current.next.take();
             return true;
         }
@@ -128,6 +132,11 @@ pub fn find_lvar(lvar: &Option<Box<LVar>>, name: &str) -> Option<i32> {
     } else {
         None
     }
+}
+
+pub fn gen_label() -> usize {
+    static LABEL: AtomicUsize = AtomicUsize::new(0);
+    LABEL.fetch_add(1, Ordering::Relaxed)
 }
 
 #[allow(dead_code)]
@@ -304,6 +313,24 @@ pub fn tokenizer(input: &str) -> Option<Box<Token>> {
             if ident_str == "return" {
                 cur = new_token(
                     TokenKind::TkReturn,
+                    cur,
+                    ident_str.to_string(),
+                    input.len() - chars.clone().count(),
+                );
+                continue;
+            }
+            if ident_str == "if" {
+                cur = new_token(
+                    TokenKind::TkIf,
+                    cur,
+                    ident_str.to_string(),
+                    input.len() - chars.clone().count(),
+                );
+                continue;
+            }
+            if ident_str == "else" {
+                cur = new_token(
+                    TokenKind::TkElse,
                     cur,
                     ident_str.to_string(),
                     input.len() - chars.clone().count(),
