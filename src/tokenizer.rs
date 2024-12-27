@@ -16,6 +16,7 @@ pub enum TokenKind {
     TkReturn,
     TkIf,
     TkElse,
+    TkWhile,
     TkEof,
 }
 
@@ -331,6 +332,15 @@ pub fn tokenizer(input: &str) -> Option<Box<Token>> {
             if ident_str == "else" {
                 cur = new_token(
                     TokenKind::TkElse,
+                    cur,
+                    ident_str.to_string(),
+                    input.len() - chars.clone().count(),
+                );
+                continue;
+            }
+            if ident_str == "while" {
+                cur = new_token(
+                    TokenKind::TkWhile,
                     cur,
                     ident_str.to_string(),
                     input.len() - chars.clone().count(),

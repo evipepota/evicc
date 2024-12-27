@@ -21,6 +21,7 @@ pub enum NodeKind {
     NdReturn, // Return
     NdIf,     // If
     NdElse,   // Else
+    NdWhile,  // While
 }
 
 #[derive(Clone)]
@@ -128,6 +129,16 @@ fn stmt(
             );
         }
         return new_node(NodeKind::NdIf, Some(Box::new(cond)), Some(Box::new(then)));
+    } else if tokenizer::consume_kind(tokenizer::TokenKind::TkWhile, &mut token.borrow_mut()) {
+        tokenizer::expect("(", &mut token.borrow_mut());
+        let cond = expr(token, lvar);
+        tokenizer::expect(")", &mut token.borrow_mut());
+        let body = stmt(token, lvar);
+        return new_node(
+            NodeKind::NdWhile,
+            Some(Box::new(cond)),
+            Some(Box::new(body)),
+        );
     }
     let node = expr(token, lvar);
     if tokenizer::consume(";", &mut token.borrow_mut()) {

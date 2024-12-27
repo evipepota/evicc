@@ -59,5 +59,7 @@ assert 3 'if (0) return 2; else if (1) return 3; else return 4;'
 assert 2 'if (1) return 2; else if (1) return 3; else return 4;'
 assert 4 'if (0) return 2; else if (0) return 3; else return 4;'
 
+assert 10 'i=0;while(i<10) i=i+1; return i;'
+
 echo OK
 

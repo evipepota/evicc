@@ -64,6 +64,18 @@ pub fn gen(node: Node) {
             }
             return;
         }
+        NodeKind::NdWhile => {
+            let label = tokenizer::gen_label();
+            println!(".Lbegin{}:", label);
+            gen(*node.clone().lhs.unwrap());
+            println!("  pop rax");
+            println!("  cmp rax, 0");
+            println!("  je .Lend{}", label);
+            gen(*node.clone().rhs.unwrap());
+            println!("  jmp .Lbegin{}", label);
+            println!(".Lend{}:", label);
+            return;
+        }
         _ => {}
     }
 
