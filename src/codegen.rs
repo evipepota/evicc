@@ -97,6 +97,13 @@ pub fn gen(node: Node) {
             println!(".Lend{}:", label);
             return;
         }
+        NodeKind::NdBlock => {
+            for stmt in node.stmts {
+                gen(stmt);
+                println!("  pop rax");
+            }
+            return;
+        }
         _ => {}
     }
 

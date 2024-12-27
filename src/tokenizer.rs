@@ -260,22 +260,20 @@ pub fn tokenizer(input: &str) -> Option<Box<Token>> {
             }
         }
 
-        if c == '+' || c == '-' || c == '*' || c == '/' || c == '(' || c == ')' {
+        if c == '+'
+            || c == '-'
+            || c == '*'
+            || c == '/'
+            || c == '('
+            || c == ')'
+            || c == '{'
+            || c == '}'
+            || c == ';'
+        {
             cur = new_token(
                 TokenKind::TkReserved,
                 cur,
                 c.to_string(),
-                input.len() - chars.clone().count(),
-            );
-            chars.next();
-            continue;
-        }
-
-        if c == ';' {
-            cur = new_token(
-                TokenKind::TkReserved,
-                cur,
-                ";".to_string(),
                 input.len() - chars.clone().count(),
             );
             chars.next();

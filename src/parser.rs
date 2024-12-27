@@ -1,6 +1,6 @@
 use std::borrow::BorrowMut;
 
-use crate::tokenizer;
+use crate::tokenizer::{self, consume};
 
 #[derive(Clone, Debug)]
 pub enum NodeKind {
@@ -23,6 +23,7 @@ pub enum NodeKind {
     NdElse,   // Else
     NdWhile,  // While
     NdFor,    // For
+    NdBlock,  // Block
 }
 
 #[derive(Clone)]
@@ -33,6 +34,7 @@ pub struct Node {
     pub name: String,
     pub val: i32,
     pub offset: i32,
+    pub stmts: Vec<Node>,
 }
 
 fn new_node(kind: NodeKind, lhs: Option<Box<Node>>, rhs: Option<Box<Node>>) -> Node {
@@ -43,6 +45,7 @@ fn new_node(kind: NodeKind, lhs: Option<Box<Node>>, rhs: Option<Box<Node>>) -> N
         name: String::new(),
         val: 0,
         offset: 0,
+        stmts: Vec::new(),
     }
 }
 
@@ -54,6 +57,7 @@ fn new_node_num(val: i32) -> Node {
         name: String::new(),
         val,
         offset: 0,
+        stmts: Vec::new(),
     }
 }
 
@@ -82,6 +86,19 @@ fn new_node_lvar(name: String, lvar: &mut Option<Box<tokenizer::LVar>>) -> Node 
         name,
         val: 0,
         offset,
+        stmts: Vec::new(),
+    }
+}
+
+pub fn new_node_block(stmts: Vec<Node>) -> Node {
+    Node {
+        kind: NodeKind::NdBlock,
+        lhs: None,
+        rhs: None,
+        name: String::new(),
+        val: 0,
+        offset: 0,
+        stmts,
     }
 }
 
@@ -177,6 +194,12 @@ fn stmt(
                 ))),
             ))),
         );
+    } else if consume("{", token) {
+        let mut stmts = Vec::new();
+        while !consume("}", token) {
+            stmts.push(stmt(token, lvar));
+        }
+        return new_node_block(stmts);
     }
     let node = expr(token, lvar);
     if tokenizer::consume(";", &mut token.borrow_mut()) {
