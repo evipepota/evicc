@@ -105,14 +105,14 @@ pub fn new_node_block(stmts: Vec<Node>) -> Node {
 pub fn program(
     token: &mut Option<Box<tokenizer::Token>>,
     lvar: &mut Option<Box<tokenizer::LVar>>,
-) -> Vec<Node> {
+) -> (Vec<Node>, i32) {
     let mut code = Vec::new();
     loop {
         let node = stmt(token, lvar);
         code.push(node.clone());
         if let Some(current) = token.borrow_mut() {
             if let tokenizer::TokenKind::TkEof = current.kind {
-                return code;
+                return (code, lvar.as_ref().unwrap().offset + 8);
             }
         }
     }

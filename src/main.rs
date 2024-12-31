@@ -16,7 +16,7 @@ fn main() {
 
     let tokens = &args[1][..];
     let token = Rc::new(RefCell::new(tokenizer::tokenizer(tokens)));
-    let code = parser::program(&mut token.borrow_mut(), &mut None);
+    let (code, max_offset) = parser::program(&mut token.borrow_mut(), &mut None);
 
     println!(".intel_syntax noprefix");
     println!(".globl main");
@@ -24,7 +24,7 @@ fn main() {
 
     println!("  push rbp");
     println!("  mov rbp, rsp");
-    println!("  sub rsp, 208");
+    println!("  sub rsp, {}", max_offset);
 
     for node in code {
         codegen::gen(node);

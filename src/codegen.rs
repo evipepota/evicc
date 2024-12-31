@@ -38,7 +38,6 @@ pub fn gen(node: Node) {
             return;
         }
         NodeKind::NdReturn => {
-            eprintln!("; return");
             gen(*node.clone().lhs.unwrap());
             println!("  pop rax");
             println!("  mov rsp, rbp");
