@@ -103,6 +103,20 @@ pub fn gen(node: Node) {
             }
             return;
         }
+        NodeKind::NdFunc => {
+            let regs = vec!["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
+            for arg in node.clone().rhs.unwrap().stmts {
+                gen(arg);
+            }
+            let mut i = node.clone().rhs.unwrap().stmts.len();
+            for _ in node.clone().rhs.unwrap().stmts {
+                i -= 1;
+                println!("  pop rax");
+                println!("  mov {}, rax", regs[i]);
+            }
+            println!("  call {}", node.clone().lhs.unwrap().name);
+            return;
+        }
         _ => {}
     }
 

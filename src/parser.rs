@@ -24,6 +24,7 @@ pub enum NodeKind {
     NdWhile,  // While
     NdFor,    // For
     NdBlock,  // Block
+    NdFunc,   // Function
 }
 
 #[derive(Clone)]
@@ -355,7 +356,25 @@ fn primary(
         if let tokenizer::TokenKind::TkNum = current.kind {
             return new_node_num(tokenizer::expect_number(&mut token.borrow_mut()));
         } else if let tokenizer::TokenKind::TkIdent = current.kind {
-            return new_node_lvar(tokenizer::expect_ident(&mut token.borrow_mut()), lvar);
+            let ident = tokenizer::expect_ident(&mut token.borrow_mut());
+
+            if tokenizer::consume("(", &mut token.borrow_mut()) {
+                let mut args = Vec::new();
+                if !tokenizer::consume(")", &mut token.borrow_mut()) {
+                    args.push(expr(token, lvar));
+                    while tokenizer::consume(",", &mut token.borrow_mut()) {
+                        args.push(expr(token, lvar));
+                    }
+                    tokenizer::expect(")", &mut token.borrow_mut());
+                }
+                return new_node(
+                    NodeKind::NdFunc,
+                    Some(Box::new(new_node_lvar(ident, lvar))),
+                    Some(Box::new(new_node_block(args))),
+                );
+            }
+
+            return new_node_lvar(ident, lvar);
         }
         tokenizer::error("expected number or ident");
     } else {
