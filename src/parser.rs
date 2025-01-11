@@ -113,7 +113,11 @@ pub fn program(
         code.push(node.clone());
         if let Some(current) = token.borrow_mut() {
             if let tokenizer::TokenKind::TkEof = current.kind {
-                return (code, lvar.as_ref().unwrap().offset + 8);
+                if let Some(lvar) = lvar {
+                    return (code, lvar.offset);
+                } else {
+                    return (code, 0);
+                }
             }
         }
     }
