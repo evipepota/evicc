@@ -103,6 +103,9 @@ pub fn new_node_block(stmts: Vec<Node>) -> Node {
     }
 }
 
+/*
+program = stmt*
+*/
 pub fn program(
     token: &mut Option<Box<tokenizer::Token>>,
     lvar: &mut Option<Box<tokenizer::LVar>>,
@@ -123,6 +126,14 @@ pub fn program(
     }
 }
 
+/*
+stmt = expr ";"
+     | "return" expr ";"
+     | "if" "(" expr ")" stmt ("else" stmt)?
+     | "while" "(" expr ")" stmt
+     | "for" "(" expr? ";" expr? ";" expr? ")" stmt
+     | "{" stmt* "}"
+*/
 fn stmt(
     token: &mut Option<Box<tokenizer::Token>>,
     lvar: &mut Option<Box<tokenizer::LVar>>,
@@ -218,6 +229,9 @@ fn stmt(
     }
 }
 
+/*
+expr = assign
+*/
 fn expr(
     token: &mut Option<Box<tokenizer::Token>>,
     lvar: &mut Option<Box<tokenizer::LVar>>,
@@ -225,6 +239,9 @@ fn expr(
     return assign(token, lvar);
 }
 
+/*
+assign = equality ("=" assign)?
+*/
 fn assign(
     token: &mut Option<Box<tokenizer::Token>>,
     lvar: &mut Option<Box<tokenizer::LVar>>,
@@ -240,6 +257,9 @@ fn assign(
     return node;
 }
 
+/*
+equality = relational ("==" relational | "!=" relational)*
+*/
 fn equality(
     token: &mut Option<Box<tokenizer::Token>>,
     lvar: &mut Option<Box<tokenizer::LVar>>,
@@ -265,6 +285,9 @@ fn equality(
     }
 }
 
+/*
+relational = add ("<" add | "<=" add | ">" add | ">=" add)*
+*/
 fn relational(
     token: &mut Option<Box<tokenizer::Token>>,
     lvar: &mut Option<Box<tokenizer::LVar>>,
@@ -302,6 +325,9 @@ fn relational(
     }
 }
 
+/*
+add = mul ("+" mul | "-" mul)*
+*/
 fn add(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<tokenizer::LVar>>) -> Node {
     let mut node = mul(token, lvar);
 
@@ -324,6 +350,9 @@ fn add(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<tokenize
     }
 }
 
+/*
+mul = unary ("*" unary | "/" unary)*
+*/
 fn mul(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<tokenizer::LVar>>) -> Node {
     let mut node = unary(token, lvar);
 
@@ -346,6 +375,9 @@ fn mul(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<tokenize
     }
 }
 
+/*
+primary = num | ident | "(" expr ")"
+*/
 fn primary(
     token: &mut Option<Box<tokenizer::Token>>,
     lvar: &mut Option<Box<tokenizer::LVar>>,
@@ -386,6 +418,9 @@ fn primary(
     }
 }
 
+/*
+unary = ("+" | "-")? primary
+*/
 fn unary(
     token: &mut Option<Box<tokenizer::Token>>,
     lvar: &mut Option<Box<tokenizer::LVar>>,
