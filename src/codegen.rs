@@ -98,8 +98,10 @@ pub fn gen(node: Node) {
         }
         NodeKind::NdBlock => {
             for stmt in node.stmts {
-                gen(stmt);
-                println!("  pop rax");
+                gen(stmt.clone());
+                if let NodeKind::NdReturn = stmt.kind {
+                    println!("  pop rax");
+                }
             }
             return;
         }
