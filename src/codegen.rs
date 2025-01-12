@@ -117,6 +117,7 @@ pub fn gen(node: Node) {
                 println!("  mov {}, rax", regs[i]);
             }
             println!("  call {}", node.clone().lhs.unwrap().name);
+            println!("  push rax");
             return;
         }
         _ => {}
