@@ -114,7 +114,7 @@ pub fn program(
         if let Some(current) = token.borrow_mut() {
             if let tokenizer::TokenKind::TkEof = current.kind {
                 if let Some(lvar) = lvar {
-                    return (code, lvar.offset);
+                    return (code, lvar.offset + 8);
                 } else {
                     return (code, 0);
                 }
