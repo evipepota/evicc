@@ -8,7 +8,7 @@ lazy_static! {
     static ref USER_INPUT: RwLock<Option<String>> = RwLock::new(None);
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum TokenKind {
     TkReserved,
     TkIdent,

@@ -16,19 +16,30 @@ fn main() {
 
     let tokens = &args[1][..];
     let token = Rc::new(RefCell::new(tokenizer::tokenizer(tokens)));
-    let (code, max_offset) = parser::program(&mut token.borrow_mut(), &mut None);
+    let codes = parser::program(&mut token.borrow_mut());
 
     println!(".intel_syntax noprefix");
     println!(".globl main");
-    println!("main:");
 
-    println!("  push rbp");
-    println!("  mov rbp, rsp");
-    println!("  sub rsp, {}", max_offset);
+    for (args, code, offset, function_name) in codes {
+        println!("{}:", function_name);
+        println!("  push rbp");
+        println!("  mov rbp, rsp");
+        println!("  sub rsp, {}", offset);
 
-    for node in code {
-        codegen::gen(node);
-        println!("  pop rax");
+        let regs = vec!["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
+        let mut i = 0;
+        for arg in args {
+            println!("  mov rax, rbp");
+            println!("  sub rax, {}", arg.offset);
+            println!("  mov [rax], {}", regs[i]);
+            i += 1;
+        }
+
+        for node in code {
+            codegen::gen(node);
+            println!("  pop rax");
+        }
     }
 
     println!("  mov rsp, rbp");

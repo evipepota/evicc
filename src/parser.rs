@@ -104,25 +104,51 @@ pub fn new_node_block(stmts: Vec<Node>) -> Node {
 }
 
 /*
-program = stmt*
+program = function*
 */
 pub fn program(
     token: &mut Option<Box<tokenizer::Token>>,
-    lvar: &mut Option<Box<tokenizer::LVar>>,
-) -> (Vec<Node>, i32) {
+) -> Vec<(Vec<Node>, Vec<Node>, i32, String)> {
     let mut code = Vec::new();
-    loop {
-        let node = stmt(token, lvar);
-        code.push(node.clone());
-        if let Some(current) = token.borrow_mut() {
-            if let tokenizer::TokenKind::TkEof = current.kind {
-                if let Some(lvar) = lvar {
-                    return (code, lvar.offset + 8);
-                } else {
-                    return (code, 0);
-                }
+    while let Some(current) = token {
+        match current.kind {
+            tokenizer::TokenKind::TkIdent => {
+                code.push(function(token));
+            }
+            tokenizer::TokenKind::TkEof => break,
+            _ => {
+                tokenizer::error_at(current.loc, "expected function");
             }
         }
+    }
+    return code;
+}
+
+/*
+function = ident "(" (ident ("," ident)*)? ")" "{" stmt* "}"
+*/
+fn function(token: &mut Option<Box<tokenizer::Token>>) -> (Vec<Node>, Vec<Node>, i32, String) {
+    let name = tokenizer::expect_ident(token);
+    tokenizer::expect("(", token);
+    let mut lvar = None;
+    let mut args = Vec::new();
+    if !tokenizer::consume(")", token) {
+        args.push(new_node_lvar(tokenizer::expect_ident(token), &mut lvar));
+        while tokenizer::consume(",", token) {
+            args.push(new_node_lvar(tokenizer::expect_ident(token), &mut lvar));
+        }
+        tokenizer::expect(")", token);
+    }
+    tokenizer::expect("{", token);
+    let mut stmts = Vec::new();
+    while !tokenizer::consume("}", token) {
+        let node = stmt(token, &mut lvar);
+        stmts.push(node.clone());
+    }
+    if let Some(lvar) = lvar {
+        return (args, stmts, lvar.offset + 8, name);
+    } else {
+        return (args, stmts, 0, name);
     }
 }
 
