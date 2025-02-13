@@ -16,6 +16,8 @@ pub enum NodeKind {
     NdLt,     // <
     NdLe,     // <=
     NdAssign, // =
+    NdDeref,  // *
+    NdAddr,   // &
     NdNum,    // Integer
     NdLvar,   // Local variable
     NdReturn, // Return
@@ -445,7 +447,7 @@ fn primary(
 }
 
 /*
-unary = ("+" | "-")? primary
+unary = ("+" | "-")? primary | "*" unary | "&" unary
 */
 fn unary(
     token: &mut Option<Box<tokenizer::Token>>,
@@ -460,6 +462,12 @@ fn unary(
             Some(Box::new(new_node_num(0))),
             Some(Box::new(primary(token, lvar))),
         );
+    }
+    if tokenizer::consume("*", &mut token.borrow_mut()) {
+        return new_node(NodeKind::NdDeref, None, Some(Box::new(unary(token, lvar))));
+    }
+    if tokenizer::consume("&", &mut token.borrow_mut()) {
+        return new_node(NodeKind::NdAddr, None, Some(Box::new(unary(token, lvar))));
     }
     primary(token, lvar)
 }

@@ -37,6 +37,17 @@ pub fn gen(node: Node) {
             println!("  push rdi");
             return;
         }
+        NodeKind::NdDeref => {
+            gen(*node.clone().rhs.unwrap());
+            println!("  pop rax");
+            println!("  push rax");
+            println!("  mov rax, [rax]");
+            return;
+        }
+        NodeKind::NdAddr => {
+            gen(*node.clone().rhs.unwrap());
+            return;
+        }
         NodeKind::NdReturn => {
             gen(*node.clone().lhs.unwrap());
             println!("  pop rax");

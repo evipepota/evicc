@@ -78,5 +78,8 @@ assert 21 'fib(i){if(i==1)return 0;else if(i==2)return 1;return fib(i-1)+fib(i-2
 assert 13 'test(i){hoge = 6+i;return hoge;} main(){a=test(3); return a+4;}'
 assert 19 'test(i, j){hoge = 6+i; hoge = hoge+j; return hoge;} main(){a=test(3, 6); return a+4;}'
 
+assert 3 'main(){x = 3;y = &x;return *y;}'
+assert 3 'main(){x = 3;y = 5;z = &y + 8;return *z;}'
+
 echo OK
 
