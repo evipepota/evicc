@@ -64,6 +64,18 @@ fn new_node_num(val: i32) -> Node {
     }
 }
 
+fn new_node_func(name: String, args: Vec<Node>) -> Node {
+    Node {
+        kind: NodeKind::NdFunc,
+        lhs: None,
+        rhs: None,
+        name,
+        val: 0,
+        offset: 0,
+        stmts: args,
+    }
+}
+
 fn new_node_lvar(name: String, lvar: &mut Option<Box<tokenizer::LVar>>) -> Node {
     let tmp = tokenizer::find_lvar(lvar, &name);
     let offset = if let Some(offset) = tmp {
@@ -431,11 +443,7 @@ fn primary(
                     }
                     tokenizer::expect(")", &mut token.borrow_mut());
                 }
-                return new_node(
-                    NodeKind::NdFunc,
-                    Some(Box::new(new_node_lvar(ident, lvar))),
-                    Some(Box::new(new_node_block(args))),
-                );
+                return new_node_func(ident, args);
             }
 
             return new_node_lvar(ident, lvar);

@@ -118,16 +118,16 @@ pub fn gen(node: Node) {
         }
         NodeKind::NdFunc => {
             let regs = vec!["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
-            for arg in node.clone().rhs.unwrap().stmts {
+            for arg in node.clone().stmts {
                 gen(arg);
             }
-            let mut i = node.clone().rhs.unwrap().stmts.len();
-            for _ in node.clone().rhs.unwrap().stmts {
+            let mut i = node.clone().stmts.len();
+            for _ in node.clone().stmts {
                 i -= 1;
                 println!("  pop rax");
                 println!("  mov {}, rax", regs[i]);
             }
-            println!("  call {}", node.clone().lhs.unwrap().name);
+            println!("  call {}", node.clone().name);
             println!("  push rax");
             return;
         }
