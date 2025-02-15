@@ -10,6 +10,12 @@ pub fn gen_lval(node: Node) {
         println!("  push rax");
         return;
     }
+    if let NodeKind::NdVardef = node.kind {
+        println!("  mov rax, rbp");
+        println!("  sub rax, {}", node.offset);
+        println!("  push rax");
+        return;
+    }
     tokenizer::error("not an lvalue");
 }
 
@@ -20,6 +26,14 @@ pub fn gen(node: Node) {
             return;
         }
         NodeKind::NdLvar => {
+            gen_lval(node.clone());
+
+            println!("  pop rax");
+            println!("  mov rax, [rax]");
+            println!("  push rax");
+            return;
+        }
+        NodeKind::NdVardef => {
             gen_lval(node.clone());
 
             println!("  pop rax");

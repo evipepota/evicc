@@ -17,6 +17,7 @@ pub enum TokenKind {
     TkIf,
     TkElse,
     TkWhile,
+    TkInt,
     TkFor,
     TkEof,
 }
@@ -351,6 +352,15 @@ pub fn tokenizer(input: &str) -> Option<Box<Token>> {
             if ident_str == "for" {
                 cur = new_token(
                     TokenKind::TkFor,
+                    cur,
+                    ident_str.to_string(),
+                    input.len() - chars.clone().count(),
+                );
+                continue;
+            }
+            if ident_str == "int" {
+                cur = new_token(
+                    TokenKind::TkInt,
                     cur,
                     ident_str.to_string(),
                     input.len() - chars.clone().count(),

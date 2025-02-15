@@ -1,6 +1,6 @@
 use std::borrow::BorrowMut;
 
-use crate::tokenizer::{self, consume};
+use crate::tokenizer::{self, consume, error, error_at};
 
 #[derive(Clone, Debug)]
 pub enum NodeKind {
@@ -27,6 +27,7 @@ pub enum NodeKind {
     NdFor,    // For
     NdBlock,  // Block
     NdFunc,   // Function
+    NdVardef, // Variable definition
 }
 
 #[derive(Clone)]
@@ -81,6 +82,32 @@ fn new_node_lvar(name: String, lvar: &mut Option<Box<tokenizer::LVar>>) -> Node 
     let offset = if let Some(offset) = tmp {
         offset
     } else {
+        println!("{}", name);
+        error("not declared variable");
+    };
+
+    *lvar = Some(Box::new(tokenizer::LVar::new(
+        lvar.take(),
+        name.clone(),
+        offset,
+    )));
+
+    Node {
+        kind: NodeKind::NdLvar,
+        lhs: None,
+        rhs: None,
+        name,
+        val: 0,
+        offset,
+        stmts: Vec::new(),
+    }
+}
+
+fn new_node_var_def(name: String, lvar: &mut Option<Box<tokenizer::LVar>>) -> Node {
+    let tmp = tokenizer::find_lvar(lvar, &name);
+    let offset = if let Some(_) = tmp {
+        error("variable already declared");
+    } else {
         if let Some(lvar) = lvar {
             lvar.offset + 8
         } else {
@@ -95,7 +122,7 @@ fn new_node_lvar(name: String, lvar: &mut Option<Box<tokenizer::LVar>>) -> Node 
     )));
 
     Node {
-        kind: NodeKind::NdLvar,
+        kind: NodeKind::NdVardef,
         lhs: None,
         rhs: None,
         name,
@@ -126,7 +153,7 @@ pub fn program(
     let mut code = Vec::new();
     while let Some(current) = token {
         match current.kind {
-            tokenizer::TokenKind::TkIdent => {
+            tokenizer::TokenKind::TkInt => {
                 code.push(function(token));
             }
             tokenizer::TokenKind::TkEof => break,
@@ -139,17 +166,26 @@ pub fn program(
 }
 
 /*
-function = ident "(" (ident ("," ident)*)? ")" "{" stmt* "}"
+function = "int" ident "(" ("int" ident ("," "int" ident)*)? ")" "{" stmt* "}"
 */
 fn function(token: &mut Option<Box<tokenizer::Token>>) -> (Vec<Node>, Vec<Node>, i32, String) {
+    if !tokenizer::consume_kind(tokenizer::TokenKind::TkInt, token) {
+        error_at(token.as_ref().unwrap().loc, "expected 'int'");
+    }
     let name = tokenizer::expect_ident(token);
     tokenizer::expect("(", token);
     let mut lvar = None;
     let mut args = Vec::new();
     if !tokenizer::consume(")", token) {
-        args.push(new_node_lvar(tokenizer::expect_ident(token), &mut lvar));
+        if !tokenizer::consume_kind(tokenizer::TokenKind::TkInt, token) {
+            error_at(token.as_ref().unwrap().loc, "expected 'int'");
+        }
+        args.push(new_node_var_def(tokenizer::expect_ident(token), &mut lvar));
         while tokenizer::consume(",", token) {
-            args.push(new_node_lvar(tokenizer::expect_ident(token), &mut lvar));
+            if !tokenizer::consume_kind(tokenizer::TokenKind::TkInt, token) {
+                error_at(token.as_ref().unwrap().loc, "expected 'int'");
+            }
+            args.push(new_node_var_def(tokenizer::expect_ident(token), &mut lvar));
         }
         tokenizer::expect(")", token);
     }
@@ -168,6 +204,7 @@ fn function(token: &mut Option<Box<tokenizer::Token>>) -> (Vec<Node>, Vec<Node>,
 
 /*
 stmt = expr ";"
+     | "int" expr ";"
      | "return" expr ";"
      | "if" "(" expr ")" stmt ("else" stmt)?
      | "while" "(" expr ")" stmt
@@ -250,6 +287,13 @@ fn stmt(
                 ))),
             ))),
         );
+    } else if tokenizer::consume_kind(tokenizer::TokenKind::TkInt, &mut token.borrow_mut()) {
+        let ident = tokenizer::expect_ident(token);
+        if tokenizer::consume(";", token) {
+            return new_node_var_def(ident, lvar);
+        } else {
+            tokenizer::error_at(token.as_ref().unwrap().loc, "expected ';'");
+        }
     } else if consume("{", token) {
         let mut stmts = Vec::new();
         while !consume("}", token) {
