@@ -40,12 +40,12 @@ pub fn gen(node: Node) {
         NodeKind::NdDeref => {
             gen(*node.clone().rhs.unwrap());
             println!("  pop rax");
-            println!("  push rax");
             println!("  mov rax, [rax]");
+            println!("  push rax");
             return;
         }
         NodeKind::NdAddr => {
-            gen(*node.clone().rhs.unwrap());
+            gen_lval(*node.clone().rhs.unwrap());
             return;
         }
         NodeKind::NdReturn => {
