@@ -1,4 +1,4 @@
-use std::borrow::BorrowMut;
+use std::{borrow::BorrowMut, iter};
 
 use crate::tokenizer::{self, consume, error, error_at};
 
@@ -38,6 +38,7 @@ pub struct Node {
     pub name: String,
     pub val: i32,
     pub offset: i32,
+    pub var_type: Option<tokenizer::Type>,
     pub stmts: Vec<Node>,
 }
 
@@ -49,11 +50,16 @@ fn new_node(kind: NodeKind, lhs: Option<Box<Node>>, rhs: Option<Box<Node>>) -> N
         name: String::new(),
         val: 0,
         offset: 0,
+        var_type: None,
         stmts: Vec::new(),
     }
 }
 
 fn new_node_num(val: i32) -> Node {
+    let num_type = tokenizer::Type {
+        ty: tokenizer::TypeKind::TyInt,
+        ptr_to: None,
+    };
     Node {
         kind: NodeKind::NdNum,
         lhs: None,
@@ -61,11 +67,19 @@ fn new_node_num(val: i32) -> Node {
         name: String::new(),
         val,
         offset: 0,
+        var_type: Some(num_type),
         stmts: Vec::new(),
     }
 }
 
 fn new_node_func(name: String, args: Vec<Node>) -> Node {
+    let func_type = tokenizer::Type {
+        ty: tokenizer::TypeKind::TyFunc,
+        ptr_to: Some(Box::new(tokenizer::Type {
+            ty: tokenizer::TypeKind::TyInt,
+            ptr_to: None,
+        })),
+    };
     Node {
         kind: NodeKind::NdFunc,
         lhs: None,
@@ -73,24 +87,20 @@ fn new_node_func(name: String, args: Vec<Node>) -> Node {
         name,
         val: 0,
         offset: 0,
+        var_type: Some(func_type),
         stmts: args,
     }
 }
 
 fn new_node_lvar(name: String, lvar: &mut Option<Box<tokenizer::LVar>>) -> Node {
-    let tmp = tokenizer::find_lvar(lvar, &name);
-    let offset = if let Some(offset) = tmp {
-        offset
+    let lvar = if let Some(lvar) = tokenizer::find_lvar(lvar, &name) {
+        *lvar
     } else {
         println!("{}", name);
         error("not declared variable");
     };
 
-    *lvar = Some(Box::new(tokenizer::LVar::new(
-        lvar.take(),
-        name.clone(),
-        offset,
-    )));
+    let node_type = lvar.ty.clone();
 
     Node {
         kind: NodeKind::NdLvar,
@@ -98,14 +108,18 @@ fn new_node_lvar(name: String, lvar: &mut Option<Box<tokenizer::LVar>>) -> Node 
         rhs: None,
         name,
         val: 0,
-        offset,
+        offset: lvar.offset,
+        var_type: Some(node_type),
         stmts: Vec::new(),
     }
 }
 
-fn new_node_var_def(name: String, lvar: &mut Option<Box<tokenizer::LVar>>) -> Node {
-    let tmp = tokenizer::find_lvar(lvar, &name);
-    let offset = if let Some(_) = tmp {
+fn new_node_var_def(
+    name: String,
+    depth_pointer: usize,
+    lvar: &mut Option<Box<tokenizer::LVar>>,
+) -> Node {
+    let offset = if let Some(_) = tokenizer::find_lvar(lvar, &name) {
         error("variable already declared");
     } else {
         if let Some(lvar) = lvar {
@@ -115,10 +129,22 @@ fn new_node_var_def(name: String, lvar: &mut Option<Box<tokenizer::LVar>>) -> No
         }
     };
 
+    let mut node_type = tokenizer::Type {
+        ty: tokenizer::TypeKind::TyInt,
+        ptr_to: None,
+    };
+    for _ in 0..depth_pointer {
+        node_type = tokenizer::Type {
+            ty: tokenizer::TypeKind::TyPtr,
+            ptr_to: Some(Box::new(node_type)),
+        };
+    }
+
     *lvar = Some(Box::new(tokenizer::LVar::new(
         lvar.take(),
         name.clone(),
         offset,
+        node_type.clone(),
     )));
 
     Node {
@@ -128,6 +154,7 @@ fn new_node_var_def(name: String, lvar: &mut Option<Box<tokenizer::LVar>>) -> No
         name,
         val: 0,
         offset,
+        var_type: Some(node_type),
         stmts: Vec::new(),
     }
 }
@@ -140,6 +167,7 @@ pub fn new_node_block(stmts: Vec<Node>) -> Node {
         name: String::new(),
         val: 0,
         offset: 0,
+        var_type: None,
         stmts,
     }
 }
@@ -166,7 +194,7 @@ pub fn program(
 }
 
 /*
-function = "int" ident "(" ("int" ident ("," "int" ident)*)? ")" "{" stmt* "}"
+function = "int" ident "(" ("int" "*"? ident ("," "int" "*"? ident)*)? ")" "{" stmt* "}"
 */
 fn function(token: &mut Option<Box<tokenizer::Token>>) -> (Vec<Node>, Vec<Node>, i32, String) {
     if !tokenizer::consume_kind(tokenizer::TokenKind::TkInt, token) {
@@ -180,12 +208,26 @@ fn function(token: &mut Option<Box<tokenizer::Token>>) -> (Vec<Node>, Vec<Node>,
         if !tokenizer::consume_kind(tokenizer::TokenKind::TkInt, token) {
             error_at(token.as_ref().unwrap().loc, "expected 'int'");
         }
-        args.push(new_node_var_def(tokenizer::expect_ident(token), &mut lvar));
+        let depth_pointer = iter::repeat(())
+            .take_while(|_| tokenizer::consume("*", token))
+            .count();
+        args.push(new_node_var_def(
+            tokenizer::expect_ident(token),
+            depth_pointer,
+            &mut lvar,
+        ));
         while tokenizer::consume(",", token) {
             if !tokenizer::consume_kind(tokenizer::TokenKind::TkInt, token) {
                 error_at(token.as_ref().unwrap().loc, "expected 'int'");
             }
-            args.push(new_node_var_def(tokenizer::expect_ident(token), &mut lvar));
+            let depth_pointer = iter::repeat(())
+                .take_while(|_| tokenizer::consume("*", token))
+                .count();
+            args.push(new_node_var_def(
+                tokenizer::expect_ident(token),
+                depth_pointer,
+                &mut lvar,
+            ));
         }
         tokenizer::expect(")", token);
     }
@@ -204,7 +246,7 @@ fn function(token: &mut Option<Box<tokenizer::Token>>) -> (Vec<Node>, Vec<Node>,
 
 /*
 stmt = expr ";"
-     | "int" expr ";"
+     | "int" "*"? expr ";"
      | "return" expr ";"
      | "if" "(" expr ")" stmt ("else" stmt)?
      | "while" "(" expr ")" stmt
@@ -288,9 +330,12 @@ fn stmt(
             ))),
         );
     } else if tokenizer::consume_kind(tokenizer::TokenKind::TkInt, &mut token.borrow_mut()) {
+        let depth_pointer = iter::repeat(())
+            .take_while(|_| tokenizer::consume("*", token))
+            .count();
         let ident = tokenizer::expect_ident(token);
         if tokenizer::consume(";", token) {
-            return new_node_var_def(ident, lvar);
+            return new_node_var_def(ident, depth_pointer, lvar);
         } else {
             tokenizer::error_at(token.as_ref().unwrap().loc, "expected ';'");
         }
@@ -460,7 +505,7 @@ fn mul(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<tokenize
 }
 
 /*
-primary = num | ident | "(" expr ")"
+primary = num | ident | ident "(" expr ")"
 */
 fn primary(
     token: &mut Option<Box<tokenizer::Token>>,

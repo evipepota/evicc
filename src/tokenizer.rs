@@ -42,16 +42,36 @@ impl Token {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct LVar {
     next: Option<Box<LVar>>,
     name: String,
     pub offset: i32,
+    pub ty: Type,
 }
 
 impl LVar {
-    pub fn new(next: Option<Box<LVar>>, name: String, offset: i32) -> Self {
-        LVar { next, name, offset }
+    pub fn new(next: Option<Box<LVar>>, name: String, offset: i32, ty: Type) -> Self {
+        LVar {
+            next,
+            name,
+            offset,
+            ty,
+        }
     }
+}
+
+#[derive(Clone, Debug)]
+pub enum TypeKind {
+    TyInt,
+    TyPtr,
+    TyFunc,
+}
+
+#[derive(Clone, Debug)]
+pub struct Type {
+    pub ty: TypeKind,
+    pub ptr_to: Option<Box<Type>>,
 }
 
 pub fn error(msg: &str) -> ! {
@@ -126,10 +146,10 @@ pub fn expect_ident(token: &mut Option<Box<Token>>) -> String {
     }
 }
 
-pub fn find_lvar(lvar: &Option<Box<LVar>>, name: &str) -> Option<i32> {
+pub fn find_lvar(lvar: &Option<Box<LVar>>, name: &str) -> Option<Box<LVar>> {
     if let Some(current) = lvar {
         if current.name == name {
-            return Some(current.offset);
+            return Some(current.clone());
         }
         find_lvar(&current.next, name)
     } else {

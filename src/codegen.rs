@@ -16,6 +16,11 @@ pub fn gen_lval(node: Node) {
         println!("  push rax");
         return;
     }
+    // if node is a dereference, push the address of the variable to the stack
+    if let NodeKind::NdDeref = node.kind {
+        gen(*node.rhs.unwrap());
+        return;
+    }
     tokenizer::error("not an lvalue");
 }
 

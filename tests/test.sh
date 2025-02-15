@@ -81,5 +81,9 @@ assert 19 'int test(int i, int j){int hoge;hoge = 6+i; hoge = hoge+j; return hog
 assert 3 'int main(){int x;x = 3;int y; y = &x;return *y;}'
 assert 3 'int main(){int x;x = 3;int y;y = 5;int z; z = &y + 8;return *z;}'
 
+assert 3 'int main(){int x;int *y;y = &x;*y = 3;return x;}'
+assert 3 'int main(){int x;int *y;int **z;y = &x;z = &y;**z = 3;return x;}'
+assert 5 'int update(int *x){*x = 5;return 0;} int main(){int x;x = 3;update(&x);return x;}'
+
 echo OK
 
