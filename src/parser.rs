@@ -58,6 +58,7 @@ fn new_node(kind: NodeKind, lhs: Option<Box<Node>>, rhs: Option<Box<Node>>) -> N
 fn new_node_num(val: i32) -> Node {
     let num_type = tokenizer::Type {
         ty: tokenizer::TypeKind::TyInt,
+        size: 4,
         ptr_to: None,
     };
     Node {
@@ -75,8 +76,10 @@ fn new_node_num(val: i32) -> Node {
 fn new_node_func(name: String, args: Vec<Node>) -> Node {
     let func_type = tokenizer::Type {
         ty: tokenizer::TypeKind::TyFunc,
+        size: 8,
         ptr_to: Some(Box::new(tokenizer::Type {
             ty: tokenizer::TypeKind::TyInt,
+            size: 4,
             ptr_to: None,
         })),
     };
@@ -131,11 +134,13 @@ fn new_node_var_def(
 
     let mut node_type = tokenizer::Type {
         ty: tokenizer::TypeKind::TyInt,
+        size: 4,
         ptr_to: None,
     };
     for _ in 0..depth_pointer {
         node_type = tokenizer::Type {
             ty: tokenizer::TypeKind::TyPtr,
+            size: 8,
             ptr_to: Some(Box::new(node_type)),
         };
     }

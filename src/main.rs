@@ -6,6 +6,7 @@ use std::rc::Rc;
 mod codegen;
 mod parser;
 mod tokenizer;
+mod util;
 
 fn main() {
     let args: Vec<String> = env::args().collect();

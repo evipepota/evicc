@@ -71,6 +71,7 @@ pub enum TypeKind {
 #[derive(Clone, Debug)]
 pub struct Type {
     pub ty: TypeKind,
+    pub size: usize,
     pub ptr_to: Option<Box<Type>>,
 }
 

@@ -1,5 +1,6 @@
 use crate::parser::{Node, NodeKind};
 use crate::tokenizer;
+use crate::util::calculate_pointer_depth;
 
 pub fn gen_lval(node: Node) {
     // check if node is an lvalue
@@ -150,59 +151,144 @@ pub fn gen(node: Node) {
             println!("  push rax");
             return;
         }
-        _ => {}
-    }
-
-    if let Some(lhs) = node.lhs {
-        gen(*lhs);
-    }
-    if let Some(rhs) = node.rhs {
-        gen(*rhs);
-    }
-
-    println!("  pop rdi");
-    println!("  pop rax");
-
-    match node.kind {
         NodeKind::NdAdd => {
+            if let Some(lhs) = node.lhs.clone() {
+                gen(*lhs);
+            }
+            if let Some(rhs) = node.rhs.clone() {
+                gen(*rhs);
+            }
+            println!("  pop rdi");
+
+            let (ptr_depth, nd) = calculate_pointer_depth(node.lhs);
+            gen_ptr_mul(ptr_depth, nd);
+
+            println!("  pop rax");
             println!("  add rax, rdi");
         }
-        NodeKind::NdSub | NodeKind::NdNeg => {
+        NodeKind::NdSub => {
+            if let Some(lhs) = node.lhs.clone() {
+                gen(*lhs);
+            }
+            if let Some(rhs) = node.rhs.clone() {
+                gen(*rhs);
+            }
+            println!("  pop rdi");
+
+            let (ptr_depth, nd) = calculate_pointer_depth(node.lhs);
+            gen_ptr_mul(ptr_depth, nd);
+
+            println!("  pop rax");
+            println!("  sub rax, rdi");
+        }
+        NodeKind::NdNeg => {
+            if let Some(lhs) = node.lhs.clone() {
+                gen(*lhs);
+            }
+            if let Some(rhs) = node.rhs.clone() {
+                gen(*rhs);
+            }
+            println!("  pop rdi");
+            println!("  pop rax");
             println!("  sub rax, rdi");
         }
         NodeKind::NdMul => {
+            if let Some(lhs) = node.lhs.clone() {
+                gen(*lhs);
+            }
+            if let Some(rhs) = node.rhs.clone() {
+                gen(*rhs);
+            }
+            println!("  pop rdi");
+            println!("  pop rax");
             println!("  imul rax, rdi");
         }
         NodeKind::NdDiv => {
+            if let Some(lhs) = node.lhs.clone() {
+                gen(*lhs);
+            }
+            if let Some(rhs) = node.rhs.clone() {
+                gen(*rhs);
+            }
+            println!("  pop rdi");
+            println!("  pop rax");
             println!("  cqo");
             println!("  idiv rdi");
         }
         NodeKind::NdEq => {
+            if let Some(lhs) = node.lhs.clone() {
+                gen(*lhs);
+            }
+            if let Some(rhs) = node.rhs.clone() {
+                gen(*rhs);
+            }
+            println!("  pop rdi");
+            println!("  pop rax");
             println!("  cmp rax, rdi");
             println!("  sete al");
             println!("  movzb rax, al");
         }
         NodeKind::NdNe => {
+            if let Some(lhs) = node.lhs.clone() {
+                gen(*lhs);
+            }
+            if let Some(rhs) = node.rhs.clone() {
+                gen(*rhs);
+            }
+            println!("  pop rdi");
+            println!("  pop rax");
             println!("  cmp rax, rdi");
             println!("  setne al");
             println!("  movzb rax, al");
         }
         NodeKind::NdLt => {
+            if let Some(lhs) = node.lhs.clone() {
+                gen(*lhs);
+            }
+            if let Some(rhs) = node.rhs.clone() {
+                gen(*rhs);
+            }
+            println!("  pop rdi");
+            println!("  pop rax");
             println!("  cmp rax, rdi");
             println!("  setl al");
             println!("  movzb rax, al");
         }
         NodeKind::NdLe => {
+            if let Some(lhs) = node.lhs.clone() {
+                gen(*lhs);
+            }
+            if let Some(rhs) = node.rhs.clone() {
+                gen(*rhs);
+            }
+            println!("  pop rdi");
+            println!("  pop rax");
             println!("  cmp rax, rdi");
             println!("  setle al");
             println!("  movzb rax, al");
         }
         NodeKind::NdGt => {
+            if let Some(lhs) = node.lhs.clone() {
+                gen(*lhs);
+            }
+            if let Some(rhs) = node.rhs.clone() {
+                gen(*rhs);
+            }
+            println!("  pop rdi");
+            println!("  pop rax");
             println!("  cmp rdi, rax");
             println!("  setl al");
             println!("  movzb rax, al");
         }
         NodeKind::NdGe => {
+            if let Some(lhs) = node.lhs.clone() {
+                gen(*lhs);
+            }
+            if let Some(rhs) = node.rhs.clone() {
+                gen(*rhs);
+            }
+            println!("  pop rdi");
+            println!("  pop rax");
             println!("  cmp rdi, rax");
             println!("  setle al");
             println!("  movzb rax, al");
@@ -211,4 +297,26 @@ pub fn gen(node: Node) {
     }
 
     println!("  push rax");
+}
+
+fn gen_ptr_mul(ptr_depth: i32, nd: Option<Box<Node>>) {
+    if let Some(nd) = nd {
+        let mut ty = nd.var_type.as_ref().unwrap();
+        if ptr_depth > 0 {
+            for _ in 0..ptr_depth + 1 {
+                ty = ty.ptr_to.as_ref().unwrap();
+            }
+            println!("  imul rdi, {}", ty.size);
+        } else if ptr_depth < 0 {
+            if ptr_depth == -1 {
+                println!("  imul rdi, {}", ty.size);
+            } else {
+                println!("  imul rdi, {}", 8);
+            }
+        } else {
+            if let tokenizer::TypeKind::TyPtr = ty.ty {
+                println!("  imul rdi, {}", ty.ptr_to.as_ref().unwrap().size);
+            }
+        }
+    }
 }

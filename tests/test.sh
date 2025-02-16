@@ -5,7 +5,8 @@ assert() {
 
 	cargo run -- "$input" > tmp.s
 	cc -c tests/sum.c -o sum.o
-	cc tmp.s sum.o -o tmp
+	cc -c tests/alloc4.c -o alloc4.o
+	cc tmp.s sum.o alloc4.o -o tmp
 	./tmp
 	actual="$?"
 
@@ -79,11 +80,17 @@ assert 13 'int test(int i){int hoge;hoge = 6+i;return hoge;} int main(){int a;a=
 assert 19 'int test(int i, int j){int hoge;hoge = 6+i; hoge = hoge+j; return hoge;} int main(){int a;a=test(3, 6); return a+4;}'
 
 assert 3 'int main(){int x;x = 3;int y; y = &x;return *y;}'
-assert 3 'int main(){int x;x = 3;int y;y = 5;int z; z = &y + 8;return *z;}'
 
 assert 3 'int main(){int x;int *y;y = &x;*y = 3;return x;}'
 assert 3 'int main(){int x;int *y;int **z;y = &x;z = &y;**z = 3;return x;}'
 assert 5 'int update(int *x){*x = 5;return 0;} int main(){int x;x = 3;update(&x);return x;}'
 
-echo OK
+assert 4 'int main(){int *p;alloc4(&p, 1, 2, 4, 8);int *q;q = p + 2;return *q;}'
+assert 8 'int main(){int *p;alloc4(&p, 1, 2, 4, 8);int *q;q = p + 3;return *q;}'
+assert 4 'int main(){int *p;alloc4(&p, 1, 2, 4, 8);int *q;q = p + 3;q = q - 1;return *q;}'
+assert 4 'int main(){int **p;int *q;alloc4(&q, 1, 2, 4, 8);p = &q;int *r; r = *p + 2;return *r;}'
+assert 1 'int main(){int **p;int *q;alloc4(&q, 1, 2, 4, 8);p = &q; return **p;}'
+assert 4 'int main(){int **p;int *q;alloc4(&q, 1, 2, 4, 8);p = &q; *p = *p + 2; return **p;}'
+assert 8 'int main(){int **p;int *q;alloc4(&q, 1, 2, 4, 8);p = &q; *p = *p + 2; q = q + 1; return **p;}'
 
+echo OK
