@@ -152,146 +152,57 @@ pub fn gen(node: Node) {
             return;
         }
         NodeKind::NdAdd => {
-            if let Some(lhs) = node.lhs.clone() {
-                gen(*lhs);
+            let (ptr_depth, num_nd) = calculate_pointer_depth(node.clone().lhs);
+            if ptr_depth != 0
+                || num_nd
+                    .as_ref()
+                    .and_then(|nd| nd.var_type.as_ref())
+                    .map_or(false, |ty| matches!(ty.ty, tokenizer::TypeKind::TyPtr))
+            {
+                gen_ptr_binary_op(ptr_depth, num_nd, node.clone(), "add");
+                return;
             }
-            if let Some(rhs) = node.rhs.clone() {
-                gen(*rhs);
-            }
-            println!("  pop rdi");
-
-            let (ptr_depth, nd) = calculate_pointer_depth(node.lhs);
-            gen_ptr_mul(ptr_depth, nd);
-
-            println!("  pop rax");
-            println!("  add rax, rdi");
+            gen_binary_op(node.clone(), "add");
         }
         NodeKind::NdSub => {
-            if let Some(lhs) = node.lhs.clone() {
-                gen(*lhs);
+            let (ptr_depth, num_nd) = calculate_pointer_depth(node.clone().lhs);
+            if ptr_depth != 0
+                || num_nd
+                    .as_ref()
+                    .and_then(|nd| nd.var_type.as_ref())
+                    .map_or(false, |ty| matches!(ty.ty, tokenizer::TypeKind::TyPtr))
+            {
+                gen_ptr_binary_op(ptr_depth, num_nd, node.clone(), "sub");
+                return;
             }
-            if let Some(rhs) = node.rhs.clone() {
-                gen(*rhs);
-            }
-            println!("  pop rdi");
-
-            let (ptr_depth, nd) = calculate_pointer_depth(node.lhs);
-            gen_ptr_mul(ptr_depth, nd);
-
-            println!("  pop rax");
-            println!("  sub rax, rdi");
+            gen_binary_op(node.clone(), "sub");
         }
         NodeKind::NdNeg => {
-            if let Some(lhs) = node.lhs.clone() {
-                gen(*lhs);
-            }
-            if let Some(rhs) = node.rhs.clone() {
-                gen(*rhs);
-            }
-            println!("  pop rdi");
-            println!("  pop rax");
-            println!("  sub rax, rdi");
+            gen_binary_op(node.clone(), "sub");
         }
         NodeKind::NdMul => {
-            if let Some(lhs) = node.lhs.clone() {
-                gen(*lhs);
-            }
-            if let Some(rhs) = node.rhs.clone() {
-                gen(*rhs);
-            }
-            println!("  pop rdi");
-            println!("  pop rax");
-            println!("  imul rax, rdi");
+            gen_binary_op(node.clone(), "imul");
         }
         NodeKind::NdDiv => {
-            if let Some(lhs) = node.lhs.clone() {
-                gen(*lhs);
-            }
-            if let Some(rhs) = node.rhs.clone() {
-                gen(*rhs);
-            }
-            println!("  pop rdi");
-            println!("  pop rax");
-            println!("  cqo");
-            println!("  idiv rdi");
+            gen_binary_op(node.clone(), "idiv");
         }
         NodeKind::NdEq => {
-            if let Some(lhs) = node.lhs.clone() {
-                gen(*lhs);
-            }
-            if let Some(rhs) = node.rhs.clone() {
-                gen(*rhs);
-            }
-            println!("  pop rdi");
-            println!("  pop rax");
-            println!("  cmp rax, rdi");
-            println!("  sete al");
-            println!("  movzb rax, al");
+            gen_cmp(node.clone(), "eq");
         }
         NodeKind::NdNe => {
-            if let Some(lhs) = node.lhs.clone() {
-                gen(*lhs);
-            }
-            if let Some(rhs) = node.rhs.clone() {
-                gen(*rhs);
-            }
-            println!("  pop rdi");
-            println!("  pop rax");
-            println!("  cmp rax, rdi");
-            println!("  setne al");
-            println!("  movzb rax, al");
+            gen_cmp(node.clone(), "ne");
         }
         NodeKind::NdLt => {
-            if let Some(lhs) = node.lhs.clone() {
-                gen(*lhs);
-            }
-            if let Some(rhs) = node.rhs.clone() {
-                gen(*rhs);
-            }
-            println!("  pop rdi");
-            println!("  pop rax");
-            println!("  cmp rax, rdi");
-            println!("  setl al");
-            println!("  movzb rax, al");
+            gen_cmp(node.clone(), "lt");
         }
         NodeKind::NdLe => {
-            if let Some(lhs) = node.lhs.clone() {
-                gen(*lhs);
-            }
-            if let Some(rhs) = node.rhs.clone() {
-                gen(*rhs);
-            }
-            println!("  pop rdi");
-            println!("  pop rax");
-            println!("  cmp rax, rdi");
-            println!("  setle al");
-            println!("  movzb rax, al");
+            gen_cmp(node.clone(), "le");
         }
         NodeKind::NdGt => {
-            if let Some(lhs) = node.lhs.clone() {
-                gen(*lhs);
-            }
-            if let Some(rhs) = node.rhs.clone() {
-                gen(*rhs);
-            }
-            println!("  pop rdi");
-            println!("  pop rax");
-            println!("  cmp rdi, rax");
-            println!("  setl al");
-            println!("  movzb rax, al");
+            gen_cmp(node.clone(), "gt");
         }
         NodeKind::NdGe => {
-            if let Some(lhs) = node.lhs.clone() {
-                gen(*lhs);
-            }
-            if let Some(rhs) = node.rhs.clone() {
-                gen(*rhs);
-            }
-            println!("  pop rdi");
-            println!("  pop rax");
-            println!("  cmp rdi, rax");
-            println!("  setle al");
-            println!("  movzb rax, al");
+            gen_cmp(node.clone(), "ge");
         }
         _ => {}
     }
@@ -299,8 +210,16 @@ pub fn gen(node: Node) {
     println!("  push rax");
 }
 
-fn gen_ptr_mul(ptr_depth: i32, nd: Option<Box<Node>>) {
-    if let Some(nd) = nd {
+fn gen_ptr_binary_op(ptr_depth: i32, num_nd: Option<Box<Node>>, node: Node, op: &str) {
+    if let Some(lhs) = node.lhs.clone() {
+        gen(*lhs);
+    }
+    if let Some(rhs) = node.rhs.clone() {
+        gen(*rhs);
+    }
+    println!("  pop rdi");
+
+    if let Some(nd) = num_nd {
         let mut ty = nd.var_type.as_ref().unwrap();
         if ptr_depth > 0 {
             for _ in 0..ptr_depth + 1 {
@@ -318,5 +237,53 @@ fn gen_ptr_mul(ptr_depth: i32, nd: Option<Box<Node>>) {
                 println!("  imul rdi, {}", ty.ptr_to.as_ref().unwrap().size);
             }
         }
+        println!("  pop rax");
+        println!("  {} rax, rdi", op);
+
+        println!("  push rax");
     }
+}
+
+fn gen_binary_op(node: Node, op: &str) {
+    if let Some(lhs) = node.lhs.clone() {
+        gen(*lhs);
+    }
+    if let Some(rhs) = node.rhs.clone() {
+        gen(*rhs);
+    }
+    println!("  pop rdi");
+    println!("  pop rax");
+    if op == "idiv" {
+        println!("  cqo");
+        println!("  idiv rdi");
+    } else {
+        println!("  {} rax, rdi", op);
+    }
+}
+
+fn gen_cmp(node: Node, op: &str) {
+    if let Some(lhs) = node.lhs.clone() {
+        gen(*lhs);
+    }
+    if let Some(rhs) = node.rhs.clone() {
+        gen(*rhs);
+    }
+    let op2 = match op {
+        "eq" => "e",
+        "ne" => "ne",
+        "lt" => "l",
+        "le" => "le",
+        "gt" => "l",
+        "ge" => "le",
+        _ => "",
+    };
+    println!("  pop rdi");
+    println!("  pop rax");
+    if op == "gt" || op == "ge" {
+        println!("  cmp rdi, rax");
+    } else {
+        println!("  cmp rax, rdi");
+    }
+    println!("  set{} al", op2);
+    println!("  movzb rax, al");
 }
