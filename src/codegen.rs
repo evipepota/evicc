@@ -1,6 +1,6 @@
 use crate::parser::{Node, NodeKind};
-use crate::tokenizer;
 use crate::util::calculate_pointer_depth;
+use crate::{tokenizer, util};
 
 pub fn gen_lval(node: Node) {
     // check if node is an lvalue
@@ -22,7 +22,7 @@ pub fn gen_lval(node: Node) {
         gen(*node.rhs.unwrap());
         return;
     }
-    tokenizer::error("not an lvalue");
+    util::error("not an lvalue");
 }
 
 pub fn gen(node: Node) {
@@ -77,7 +77,7 @@ pub fn gen(node: Node) {
             return;
         }
         NodeKind::NdIf => {
-            let label = tokenizer::gen_label();
+            let label = util::gen_label();
             gen(*node.clone().lhs.unwrap());
             println!("  pop rax");
             println!("  cmp rax, 0");
@@ -96,7 +96,7 @@ pub fn gen(node: Node) {
             return;
         }
         NodeKind::NdWhile => {
-            let label = tokenizer::gen_label();
+            let label = util::gen_label();
             println!(".Lbegin{}:", label);
             gen(*node.clone().lhs.unwrap());
             println!("  pop rax");
@@ -108,7 +108,7 @@ pub fn gen(node: Node) {
             return;
         }
         NodeKind::NdFor => {
-            let label = tokenizer::gen_label();
+            let label = util::gen_label();
             if let Some(init) = node.clone().lhs {
                 gen(*init);
             }
