@@ -79,7 +79,7 @@ assert 21 'int fib(int i){if(i==1)return 0;else if(i==2)return 1;return fib(i-1)
 assert 13 'int test(int i){int hoge;hoge = 6+i;return hoge;} int main(){int a;a=test(3); return a+4;}'
 assert 19 'int test(int i, int j){int hoge;hoge = 6+i; hoge = hoge+j; return hoge;} int main(){int a;a=test(3, 6); return a+4;}'
 
-assert 3 'int main(){int x;x = 3;int y; y = &x;return *y;}'
+assert 3 'int main(){int x;x = 3;int *y; y = &x;return *y;}'
 
 assert 3 'int main(){int x;int *y;y = &x;*y = 3;return x;}'
 assert 3 'int main(){int x;int *y;int **z;y = &x;z = &y;**z = 3;return x;}'
@@ -100,5 +100,11 @@ assert 8 'int main(){int a;int *b;return sizeof(b+4);}'
 assert 4 'int main(){int a;int *b;return sizeof(*b);}'
 assert 4 'int main(){int a;int *b;return sizeof(1);}'
 assert 4 'int main(){int a;int *b;return sizeof(sizeof(1));}'
+
+assert 3 'int main(){int a[3];*a = 3;return *a;}'
+assert 3 'int main(){int a[3];int *p;p = a;*p = 3;return *p;}'
+assert 2 'int main(){int a[3];*a = 3;*(a+1) = 2;return *(a+1);}'
+assert 2 'int main(){int a[3];*a = 3;*(a+1) = 2;int *p;p=a;return *(p+1);}'
+assert 3 'int main(){int a[3];*a = 1;*(a+1) = 2;return *a + *(a+1);}'
 
 echo OK

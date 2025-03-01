@@ -1,11 +1,11 @@
 use std::{borrow::BorrowMut, iter};
 
 use crate::ast::{
-    new_node, new_node_block, new_node_func, new_node_lvar, new_node_num, new_node_var_def, Node,
-    NodeKind,
+    new_node, new_node_block, new_node_func, new_node_lvar, new_node_num, new_node_var_def,
+    new_node_var_def_array, Node, NodeKind,
 };
 use crate::lvar::LVar;
-use crate::sema::add_type;
+use crate::sema::{add_type, TypeKind};
 use crate::tokenizer;
 use crate::util::{consume, consume_kind, error, error_at, expect, expect_ident, expect_number};
 
@@ -79,7 +79,8 @@ fn function(token: &mut Option<Box<tokenizer::Token>>) -> (Vec<Node>, Vec<Node>,
 
 /*
 stmt = expr ";"
-     | "int" "*"? expr ";"
+     | "int" "*"? ident ";"
+     | "int" ident "[" num "]" ";"
      | "return" expr ";"
      | "if" "(" expr ")" stmt ("else" stmt)?
      | "while" "(" expr ")" stmt
@@ -164,6 +165,12 @@ fn stmt(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<LVar>>)
         let ident = expect_ident(token);
         if consume(";", token) {
             return new_node_var_def(ident, depth_pointer, lvar);
+        } else if consume("[", token) {
+            assert!(depth_pointer == 0);
+            let size = expect_number(token);
+            expect("]", token);
+            expect(";", token);
+            return new_node_var_def_array(ident, size, lvar, TypeKind::TyInt);
         } else {
             error_at(token.as_ref().unwrap().loc, "expected ';'");
         }
@@ -283,12 +290,14 @@ fn add(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<LVar>>) 
                 Some(Box::new(node)),
                 Some(Box::new(mul(token, lvar))),
             );
+            add_type(&mut node);
         } else if consume("-", &mut token.borrow_mut()) {
             node = new_node(
                 NodeKind::NdSub,
                 Some(Box::new(node)),
                 Some(Box::new(mul(token, lvar))),
             );
+            add_type(&mut node);
         } else {
             return node;
         }
@@ -344,7 +353,10 @@ fn unary(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<LVar>>
         }
     }
     if consume("*", &mut token.borrow_mut()) {
-        return new_node(NodeKind::NdDeref, None, Some(Box::new(unary(token, lvar))));
+        let mut new_deref_node =
+            new_node(NodeKind::NdDeref, None, Some(Box::new(unary(token, lvar))));
+        add_type(&mut new_deref_node);
+        return new_deref_node;
     }
     if consume("&", &mut token.borrow_mut()) {
         return new_node(NodeKind::NdAddr, None, Some(Box::new(unary(token, lvar))));

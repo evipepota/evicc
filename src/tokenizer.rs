@@ -156,6 +156,8 @@ pub fn tokenizer(input: &str) -> Option<Box<Token>> {
             || c == ';'
             || c == ','
             || c == '&'
+            || c == '['
+            || c == ']'
         {
             cur = new_token(
                 TokenKind::TkReserved,

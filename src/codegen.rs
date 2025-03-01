@@ -1,7 +1,23 @@
 use crate::ast::{Node, NodeKind};
 use crate::sema::TypeKind;
 use crate::util;
-use crate::util::calculate_pointer_depth;
+
+fn load(node: Node) {
+    println!("  pop rax");
+    if let TypeKind::TyArray = node.clone().var_type.as_ref().unwrap().ty {
+    } else {
+        println!("  mov rax, [rax]");
+    }
+    println!("  push rax");
+}
+
+fn store(node: Node) {
+    println!("  pop rdi");
+    println!("  pop rax");
+
+    println!("  mov [rax], rdi");
+    println!("  push rdi");
+}
 
 pub fn gen_lval(node: Node) {
     // check if node is an lvalue
@@ -35,34 +51,26 @@ pub fn gen(node: Node) {
         NodeKind::NdLvar => {
             gen_lval(node.clone());
 
-            println!("  pop rax");
-            println!("  mov rax, [rax]");
-            println!("  push rax");
+            load(node);
             return;
         }
         NodeKind::NdVardef => {
             gen_lval(node.clone());
 
-            println!("  pop rax");
-            println!("  mov rax, [rax]");
-            println!("  push rax");
+            load(node);
             return;
         }
         NodeKind::NdAssign => {
             gen_lval(*node.clone().lhs.unwrap());
             gen(*node.clone().rhs.unwrap());
 
-            println!("  pop rdi");
-            println!("  pop rax");
-            println!("  mov [rax], rdi");
-            println!("  push rdi");
+            store(node.clone());
             return;
         }
         NodeKind::NdDeref => {
             gen(*node.clone().rhs.unwrap());
-            println!("  pop rax");
-            println!("  mov rax, [rax]");
-            println!("  push rax");
+
+            load(node);
             return;
         }
         NodeKind::NdAddr => {
@@ -153,30 +161,28 @@ pub fn gen(node: Node) {
             return;
         }
         NodeKind::NdAdd => {
-            let (ptr_depth, num_nd) = calculate_pointer_depth(node.clone().lhs);
-            if ptr_depth != 0
-                || num_nd
-                    .as_ref()
-                    .and_then(|nd| nd.var_type.as_ref())
-                    .map_or(false, |ty| matches!(ty.ty, TypeKind::TyPtr))
-            {
-                gen_ptr_binary_op(ptr_depth, num_nd, node.clone(), "add");
-                return;
+            let lty = node.clone().lhs.unwrap().var_type.unwrap();
+            let rty = node.clone().rhs.unwrap().var_type.unwrap();
+            match (lty.ty, rty.ty) {
+                (TypeKind::TyInt, TypeKind::TyInt) => {
+                    gen_binary_op(node.clone(), "add");
+                }
+                _ => {
+                    gen_ptr_binary_op(node.clone(), "add");
+                }
             }
-            gen_binary_op(node.clone(), "add");
         }
         NodeKind::NdSub => {
-            let (ptr_depth, num_nd) = calculate_pointer_depth(node.clone().lhs);
-            if ptr_depth != 0
-                || num_nd
-                    .as_ref()
-                    .and_then(|nd| nd.var_type.as_ref())
-                    .map_or(false, |ty| matches!(ty.ty, TypeKind::TyPtr))
-            {
-                gen_ptr_binary_op(ptr_depth, num_nd, node.clone(), "sub");
-                return;
+            let lty = node.clone().lhs.unwrap().var_type.unwrap();
+            let rty = node.clone().rhs.unwrap().var_type.unwrap();
+            match (lty.ty, rty.ty) {
+                (TypeKind::TyInt, TypeKind::TyInt) => {
+                    gen_binary_op(node.clone(), "sub");
+                }
+                _ => {
+                    gen_ptr_binary_op(node.clone(), "sub");
+                }
             }
-            gen_binary_op(node.clone(), "sub");
         }
         NodeKind::NdNeg => {
             gen_binary_op(node.clone(), "sub");
@@ -211,7 +217,7 @@ pub fn gen(node: Node) {
     println!("  push rax");
 }
 
-fn gen_ptr_binary_op(ptr_depth: i32, num_nd: Option<Box<Node>>, node: Node, op: &str) {
+fn gen_ptr_binary_op(node: Node, op: &str) {
     if let Some(lhs) = node.lhs.clone() {
         gen(*lhs);
     }
@@ -220,29 +226,11 @@ fn gen_ptr_binary_op(ptr_depth: i32, num_nd: Option<Box<Node>>, node: Node, op: 
     }
     println!("  pop rdi");
 
-    if let Some(nd) = num_nd {
-        let mut ty = nd.var_type.as_ref().unwrap();
-        if ptr_depth > 0 {
-            for _ in 0..ptr_depth + 1 {
-                ty = ty.ptr_to.as_ref().unwrap();
-            }
-            println!("  imul rdi, {}", ty.size);
-        } else if ptr_depth < 0 {
-            if ptr_depth == -1 {
-                println!("  imul rdi, {}", ty.size);
-            } else {
-                println!("  imul rdi, {}", 8);
-            }
-        } else {
-            if let TypeKind::TyPtr = ty.ty {
-                println!("  imul rdi, {}", ty.ptr_to.as_ref().unwrap().size);
-            }
-        }
-        println!("  pop rax");
-        println!("  {} rax, rdi", op);
-
-        println!("  push rax");
-    }
+    let ty = node.lhs.unwrap().var_type.unwrap().ptr_to.unwrap();
+    let ty_size = ty.size;
+    println!("  imul rdi, {}", ty_size);
+    println!("  pop rax");
+    println!("  {} rax, rdi", op);
 }
 
 fn gen_binary_op(node: Node, op: &str) {
