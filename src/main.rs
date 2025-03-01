@@ -32,11 +32,16 @@ fn main() {
         println!("  sub rsp, {}", offset);
 
         let regs = vec!["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
+        let regs_32 = vec!["edi", "esi", "edx", "ecx", "r8d", "r9d"];
         let mut i = 0;
         for arg in args {
             println!("  mov rax, rbp");
             println!("  sub rax, {}", arg.offset);
-            println!("  mov [rax], {}", regs[i]);
+            if arg.var_type.as_ref().unwrap().ty == sema::TypeKind::TyInt {
+                println!("  mov [rax], {}", regs_32[i]);
+            } else {
+                println!("  mov [rax], {}", regs[i]);
+            }
             i += 1;
         }
 

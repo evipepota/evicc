@@ -117,9 +117,9 @@ pub fn new_node_var_def(name: String, depth_pointer: usize, lvar: &mut Option<Bo
         error("variable already declared");
     } else {
         if let Some(lvar) = lvar {
-            lvar.offset + 8
+            lvar.offset + node_type.clone().unwrap().size as i32
         } else {
-            8
+            8 + node_type.clone().unwrap().size as i32
         }
     };
 
@@ -154,7 +154,7 @@ pub fn new_node_var_def_array(
         if let Some(lvar) = lvar {
             lvar.offset + (size * ty.size())
         } else {
-            size * ty.size()
+            8 + size * ty.size()
         }
     };
 

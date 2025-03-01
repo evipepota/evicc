@@ -6,7 +6,11 @@ fn load(node: Node) {
     println!("  pop rax");
     if let TypeKind::TyArray = node.clone().var_type.as_ref().unwrap().ty {
     } else {
-        println!("  mov rax, [rax]");
+        if node.var_type.unwrap().ty == TypeKind::TyInt {
+            println!("  mov eax, [rax]");
+        } else {
+            println!("  mov rax, [rax]");
+        }
     }
     println!("  push rax");
 }
@@ -14,8 +18,11 @@ fn load(node: Node) {
 fn store(node: Node) {
     println!("  pop rdi");
     println!("  pop rax");
-
-    println!("  mov [rax], rdi");
+    if node.lhs.unwrap().var_type.unwrap().ty == TypeKind::TyInt {
+        println!("  mov [rax], edi");
+    } else {
+        println!("  mov [rax], rdi");
+    }
     println!("  push rdi");
 }
 
@@ -57,7 +64,6 @@ pub fn gen(node: Node) {
         NodeKind::NdVardef => {
             gen_lval(node.clone());
 
-            load(node);
             return;
         }
         NodeKind::NdAssign => {
