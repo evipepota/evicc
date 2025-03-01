@@ -365,7 +365,7 @@ fn unary(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<LVar>>
 }
 
 /*
-primary = num | ident | ident "(" expr ")"
+primary = num | ident | ident "(" expr ")" | ident "[" expr "]"
 */
 fn primary(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<LVar>>) -> Node {
     if consume("(", &mut token.borrow_mut()) {
@@ -390,6 +390,16 @@ fn primary(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<LVar
                     expect(")", &mut token.borrow_mut());
                 }
                 return new_node_func(ident, args);
+            } else if consume("[", &mut token.borrow_mut()) {
+                let node = expr(token, lvar);
+                expect("]", &mut token.borrow_mut());
+                let array_node = new_node_lvar(ident, lvar);
+                let add_node = new_node(
+                    NodeKind::NdAdd,
+                    Some(Box::new(array_node)),
+                    Some(Box::new(node)),
+                );
+                return new_node(NodeKind::NdDeref, None, Some(Box::new(add_node)));
             }
 
             return new_node_lvar(ident, lvar);
