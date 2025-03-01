@@ -3,7 +3,9 @@ use std::env;
 use std::process;
 use std::rc::Rc;
 
+mod ast;
 mod codegen;
+mod lvar;
 mod parser;
 mod sema;
 mod tokenizer;

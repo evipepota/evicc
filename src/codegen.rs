@@ -1,6 +1,7 @@
-use crate::parser::{Node, NodeKind};
+use crate::ast::{Node, NodeKind};
+use crate::sema::TypeKind;
+use crate::util;
 use crate::util::calculate_pointer_depth;
-use crate::{tokenizer, util};
 
 pub fn gen_lval(node: Node) {
     // check if node is an lvalue
@@ -157,7 +158,7 @@ pub fn gen(node: Node) {
                 || num_nd
                     .as_ref()
                     .and_then(|nd| nd.var_type.as_ref())
-                    .map_or(false, |ty| matches!(ty.ty, tokenizer::TypeKind::TyPtr))
+                    .map_or(false, |ty| matches!(ty.ty, TypeKind::TyPtr))
             {
                 gen_ptr_binary_op(ptr_depth, num_nd, node.clone(), "add");
                 return;
@@ -170,7 +171,7 @@ pub fn gen(node: Node) {
                 || num_nd
                     .as_ref()
                     .and_then(|nd| nd.var_type.as_ref())
-                    .map_or(false, |ty| matches!(ty.ty, tokenizer::TypeKind::TyPtr))
+                    .map_or(false, |ty| matches!(ty.ty, TypeKind::TyPtr))
             {
                 gen_ptr_binary_op(ptr_depth, num_nd, node.clone(), "sub");
                 return;
@@ -233,7 +234,7 @@ fn gen_ptr_binary_op(ptr_depth: i32, num_nd: Option<Box<Node>>, node: Node, op: 
                 println!("  imul rdi, {}", 8);
             }
         } else {
-            if let tokenizer::TypeKind::TyPtr = ty.ty {
+            if let TypeKind::TyPtr = ty.ty {
                 println!("  imul rdi, {}", ty.ptr_to.as_ref().unwrap().size);
             }
         }

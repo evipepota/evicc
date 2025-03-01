@@ -35,39 +35,6 @@ impl Token {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct LVar {
-    pub next: Option<Box<LVar>>,
-    pub name: String,
-    pub offset: i32,
-    pub ty: Type,
-}
-
-impl LVar {
-    pub fn new(next: Option<Box<LVar>>, name: String, offset: i32, ty: Type) -> Self {
-        LVar {
-            next,
-            name,
-            offset,
-            ty,
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub enum TypeKind {
-    TyInt,
-    TyPtr,
-    TyFunc,
-}
-
-#[derive(Clone, Debug)]
-pub struct Type {
-    pub ty: TypeKind,
-    pub size: usize,
-    pub ptr_to: Option<Box<Type>>,
-}
-
 fn new_token(kind: TokenKind, cur: &mut Token, str: String, loc: usize) -> &mut Token {
     let tok = Token::new(kind, None, str.to_string(), loc);
     cur.next = Some(Box::new(tok));

@@ -1,5 +1,18 @@
-use crate::parser::{Node, NodeKind};
-use crate::tokenizer::{Type, TypeKind};
+use crate::ast::{Node, NodeKind};
+
+#[derive(Clone, Debug)]
+pub enum TypeKind {
+    TyInt,
+    TyPtr,
+    TyFunc,
+}
+
+#[derive(Clone, Debug)]
+pub struct Type {
+    pub ty: TypeKind,
+    pub size: usize,
+    pub ptr_to: Option<Box<Type>>,
+}
 
 pub fn new_type_int() -> Option<Box<Type>> {
     return new_type(TypeKind::TyInt, 4, None);

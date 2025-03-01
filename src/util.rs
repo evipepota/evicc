@@ -3,8 +3,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::RwLock;
 use std::{process, usize};
 
-use crate::parser::{Node, NodeKind};
-use crate::tokenizer::{LVar, Token, TokenKind};
+use crate::ast::{Node, NodeKind};
+use crate::lvar::LVar;
+use crate::tokenizer::{Token, TokenKind};
 
 lazy_static! {
     pub static ref USER_INPUT: RwLock<Option<String>> = RwLock::new(None);
