@@ -1,7 +1,7 @@
-use std::process;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use lazy_static::lazy_static;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::RwLock;
+use std::{process, usize};
 
 use crate::parser::{Node, NodeKind};
 use crate::tokenizer::{LVar, Token, TokenKind};

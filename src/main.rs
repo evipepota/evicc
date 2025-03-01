@@ -5,6 +5,7 @@ use std::rc::Rc;
 
 mod codegen;
 mod parser;
+mod sema;
 mod tokenizer;
 mod util;
 

@@ -1,5 +1,6 @@
 use std::{borrow::BorrowMut, iter};
 
+use crate::sema::{add_type, new_type_int, new_type_ptr};
 use crate::tokenizer;
 use crate::util::{
     consume, consume_kind, error, error_at, expect, expect_ident, expect_number, find_lvar,
@@ -41,7 +42,7 @@ pub struct Node {
     pub name: String,
     pub val: i32,
     pub offset: i32,
-    pub var_type: Option<tokenizer::Type>,
+    pub var_type: Option<Box<tokenizer::Type>>,
     pub stmts: Vec<Node>,
 }
 
@@ -59,11 +60,6 @@ fn new_node(kind: NodeKind, lhs: Option<Box<Node>>, rhs: Option<Box<Node>>) -> N
 }
 
 fn new_node_num(val: i32) -> Node {
-    let num_type = tokenizer::Type {
-        ty: tokenizer::TypeKind::TyInt,
-        size: 4,
-        ptr_to: None,
-    };
     Node {
         kind: NodeKind::NdNum,
         lhs: None,
@@ -71,7 +67,7 @@ fn new_node_num(val: i32) -> Node {
         name: String::new(),
         val,
         offset: 0,
-        var_type: Some(num_type),
+        var_type: new_type_int(),
         stmts: Vec::new(),
     }
 }
@@ -80,11 +76,7 @@ fn new_node_func(name: String, args: Vec<Node>) -> Node {
     let func_type = tokenizer::Type {
         ty: tokenizer::TypeKind::TyFunc,
         size: 8,
-        ptr_to: Some(Box::new(tokenizer::Type {
-            ty: tokenizer::TypeKind::TyInt,
-            size: 4,
-            ptr_to: None,
-        })),
+        ptr_to: new_type_int(),
     };
     Node {
         kind: NodeKind::NdFunc,
@@ -93,7 +85,7 @@ fn new_node_func(name: String, args: Vec<Node>) -> Node {
         name,
         val: 0,
         offset: 0,
-        var_type: Some(func_type),
+        var_type: Some(Box::new(func_type)),
         stmts: args,
     }
 }
@@ -115,7 +107,7 @@ fn new_node_lvar(name: String, lvar: &mut Option<Box<tokenizer::LVar>>) -> Node 
         name,
         val: 0,
         offset: lvar.offset,
-        var_type: Some(node_type),
+        var_type: Some(Box::new(node_type)),
         stmts: Vec::new(),
     }
 }
@@ -135,24 +127,16 @@ fn new_node_var_def(
         }
     };
 
-    let mut node_type = tokenizer::Type {
-        ty: tokenizer::TypeKind::TyInt,
-        size: 4,
-        ptr_to: None,
-    };
+    let mut node_type = new_type_int();
     for _ in 0..depth_pointer {
-        node_type = tokenizer::Type {
-            ty: tokenizer::TypeKind::TyPtr,
-            size: 8,
-            ptr_to: Some(Box::new(node_type)),
-        };
+        node_type = new_type_ptr(node_type);
     }
 
     *lvar = Some(Box::new(tokenizer::LVar::new(
         lvar.take(),
         name.clone(),
         offset,
-        node_type.clone(),
+        node_type.clone().unwrap().as_ref().clone(),
     )));
 
     Node {
@@ -162,7 +146,7 @@ fn new_node_var_def(
         name,
         val: 0,
         offset,
-        var_type: Some(node_type),
+        var_type: node_type,
         stmts: Vec::new(),
     }
 }
@@ -563,10 +547,13 @@ fn unary(
         );
     }
     if consume_kind(tokenizer::TokenKind::TkSizeof, token) {
-        expect("(", token);
-        let node = unary(token, lvar);
-        expect(")", token);
-        return new_node_num(node.var_type.as_ref().unwrap().size as i32);
+        let mut node = unary(token, lvar);
+        add_type(&mut node);
+        if let Some(ty) = node.var_type {
+            return new_node_num(ty.size as i32);
+        } else {
+            error("no type");
+        }
     }
     if consume("*", &mut token.borrow_mut()) {
         return new_node(NodeKind::NdDeref, None, Some(Box::new(unary(token, lvar))));

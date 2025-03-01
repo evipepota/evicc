@@ -6,7 +6,7 @@ assert() {
 	cargo run -- "$input" > tmp.s
 	cc -c tests/sum.c -o sum.o
 	cc -c tests/alloc4.c -o alloc4.o
-	cc tmp.s sum.o alloc4.o -o tmp
+	cc tmp.s sum.o alloc4.o -o tmp -Wa,--noexecstack
 	./tmp
 	actual="$?"
 
@@ -92,5 +92,13 @@ assert 4 'int main(){int **p;int *q;alloc4(&q, 1, 2, 4, 8);p = &q;int *r; r = *p
 assert 1 'int main(){int **p;int *q;alloc4(&q, 1, 2, 4, 8);p = &q; return **p;}'
 assert 4 'int main(){int **p;int *q;alloc4(&q, 1, 2, 4, 8);p = &q; *p = *p + 2; return **p;}'
 assert 8 'int main(){int **p;int *q;alloc4(&q, 1, 2, 4, 8);p = &q; *p = *p + 2; q = q + 1; return **p;}'
+
+assert 4 'int main(){int a;int *b;return sizeof(a);}'
+assert 8 'int main(){int a;int *b;return sizeof(b);}'
+assert 4 'int main(){int a;int *b;return sizeof(a+4);}'
+assert 8 'int main(){int a;int *b;return sizeof(b+4);}'
+assert 4 'int main(){int a;int *b;return sizeof(*b);}'
+assert 4 'int main(){int a;int *b;return sizeof(1);}'
+assert 4 'int main(){int a;int *b;return sizeof(sizeof(1));}'
 
 echo OK
