@@ -1,25 +1,28 @@
 use std::{borrow::BorrowMut, iter};
 
 use crate::ast::{
-    new_node, new_node_block, new_node_func, new_node_lvar, new_node_num, new_node_var_def,
-    new_node_var_def_array, Node, NodeKind,
+    new_node, new_node_block, new_node_func, new_node_gvar_def, new_node_gvar_def_array,
+    new_node_lvar, new_node_num, new_node_var_def, new_node_var_def_array, Node, NodeKind,
 };
 use crate::lvar::LVar;
 use crate::sema::{add_type, TypeKind};
 use crate::tokenizer;
-use crate::util::{consume, consume_kind, error, error_at, expect, expect_ident, expect_number};
+use crate::util::{
+    check, consume, consume_kind, error, error_at, expect, expect_ident, expect_number,
+};
 
 /*
-program = function*
+program = (global | function)*
 */
 pub fn program(
     token: &mut Option<Box<tokenizer::Token>>,
-) -> Vec<(Vec<Node>, Vec<Node>, i32, String)> {
+) -> (Vec<(Vec<Node>, Vec<Node>, i32, String)>, Option<Box<LVar>>) {
     let mut code = Vec::new();
+    let mut gloval_vars = None;
     while let Some(current) = token {
         match current.kind {
             tokenizer::TokenKind::TkInt => {
-                code.push(function(token));
+                global_or_function(token, &mut code, &mut gloval_vars);
             }
             tokenizer::TokenKind::TkEof => break,
             _ => {
@@ -27,17 +30,57 @@ pub fn program(
             }
         }
     }
-    return code;
+    return (code, gloval_vars);
 }
 
-/*
-function = "int" ident "(" ("int" "*"? ident ("," "int" "*"? ident)*)? ")" "{" stmt* "}"
-*/
-fn function(token: &mut Option<Box<tokenizer::Token>>) -> (Vec<Node>, Vec<Node>, i32, String) {
+// global_or_function = "int" "*"? ident (function | global)
+fn global_or_function(
+    token: &mut Option<Box<tokenizer::Token>>,
+    code: &mut Vec<(Vec<Node>, Vec<Node>, i32, String)>,
+    gvar: &mut Option<Box<LVar>>,
+) {
     if !consume_kind(tokenizer::TokenKind::TkInt, token) {
         error_at(token.as_ref().unwrap().loc, "expected 'int'");
     }
-    let name = expect_ident(token);
+    let depth_pointer = iter::repeat(()).take_while(|_| consume("*", token)).count();
+    let ident = expect_ident(token);
+    if check("(", token) {
+        let func = function(token, ident, gvar);
+        code.push(func);
+    } else {
+        global(token, ident, depth_pointer, gvar);
+    }
+}
+
+/*
+global =  ("[" num "]")? ";"
+*/
+fn global(
+    token: &mut Option<Box<tokenizer::Token>>,
+    ident: String,
+    depth_pointer: usize,
+    gvar: &mut Option<Box<LVar>>,
+) -> Node {
+    if consume(";", token) {
+        return new_node_gvar_def(ident, depth_pointer, gvar);
+    } else if consume("[", token) {
+        let size = expect_number(token);
+        expect("]", token);
+        expect(";", token);
+        return new_node_gvar_def_array(ident, size, gvar, TypeKind::TyInt);
+    } else {
+        error_at(token.as_ref().unwrap().loc, "expected ';'");
+    }
+}
+
+/*
+function = "(" ("int" "*"? ident ("," "int" "*"? ident)*)? ")" "{" stmt* "}"
+*/
+fn function(
+    token: &mut Option<Box<tokenizer::Token>>,
+    ident: String,
+    gvar: &mut Option<Box<LVar>>,
+) -> (Vec<Node>, Vec<Node>, i32, String) {
     expect("(", token);
     let mut lvar = None;
     let mut args = Vec::new();
@@ -67,13 +110,13 @@ fn function(token: &mut Option<Box<tokenizer::Token>>) -> (Vec<Node>, Vec<Node>,
     expect("{", token);
     let mut stmts = Vec::new();
     while !consume("}", token) {
-        let node = stmt(token, &mut lvar);
+        let node = stmt(token, &mut lvar, gvar);
         stmts.push(node.clone());
     }
     if let Some(lvar) = lvar {
-        return (args, stmts, lvar.offset + 8, name);
+        return (args, stmts, lvar.offset + 8, ident);
     } else {
-        return (args, stmts, 0, name);
+        return (args, stmts, 0, ident);
     }
 }
 
@@ -87,9 +130,17 @@ stmt = expr ";"
      | "for" "(" expr? ";" expr? ";" expr? ")" stmt
      | "{" stmt* "}"
 */
-fn stmt(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<LVar>>) -> Node {
+fn stmt(
+    token: &mut Option<Box<tokenizer::Token>>,
+    lvar: &mut Option<Box<LVar>>,
+    gvar: &mut Option<Box<LVar>>,
+) -> Node {
     if consume_kind(tokenizer::TokenKind::TkReturn, &mut token.borrow_mut()) {
-        let node = new_node(NodeKind::NdReturn, Some(Box::new(expr(token, lvar))), None);
+        let node = new_node(
+            NodeKind::NdReturn,
+            Some(Box::new(expr(token, lvar, gvar))),
+            None,
+        );
         if consume(";", &mut token.borrow_mut()) {
             return node;
         } else {
@@ -97,11 +148,11 @@ fn stmt(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<LVar>>)
         }
     } else if consume_kind(tokenizer::TokenKind::TkIf, &mut token.borrow_mut()) {
         expect("(", &mut token.borrow_mut());
-        let cond = expr(token, lvar);
+        let cond = expr(token, lvar, gvar);
         expect(")", &mut token.borrow_mut());
-        let then = stmt(token, lvar);
+        let then = stmt(token, lvar, gvar);
         if consume_kind(tokenizer::TokenKind::TkElse, &mut token.borrow_mut()) {
-            let els = stmt(token, lvar);
+            let els = stmt(token, lvar, gvar);
             return new_node(
                 NodeKind::NdIf,
                 Some(Box::new(cond)),
@@ -115,9 +166,9 @@ fn stmt(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<LVar>>)
         return new_node(NodeKind::NdIf, Some(Box::new(cond)), Some(Box::new(then)));
     } else if consume_kind(tokenizer::TokenKind::TkWhile, &mut token.borrow_mut()) {
         expect("(", &mut token.borrow_mut());
-        let cond = expr(token, lvar);
+        let cond = expr(token, lvar, gvar);
         expect(")", &mut token.borrow_mut());
-        let body = stmt(token, lvar);
+        let body = stmt(token, lvar, gvar);
         return new_node(
             NodeKind::NdWhile,
             Some(Box::new(cond)),
@@ -128,25 +179,25 @@ fn stmt(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<LVar>>)
         let init = if consume(";", token) {
             None
         } else {
-            let result = expr(token, lvar);
+            let result = expr(token, lvar, gvar);
             expect(";", &mut token.borrow_mut());
             Some(result)
         };
         let cond = if consume(";", token) {
             None
         } else {
-            let result = expr(token, lvar);
+            let result = expr(token, lvar, gvar);
             expect(";", &mut token.borrow_mut());
             Some(result)
         };
         let inc = if consume(")", token) {
             None
         } else {
-            let result = expr(token, lvar);
+            let result = expr(token, lvar, gvar);
             expect(")", &mut token.borrow_mut());
             Some(result)
         };
-        let body = stmt(token, lvar);
+        let body = stmt(token, lvar, gvar);
         return new_node(
             NodeKind::NdFor,
             init.map(Box::new),
@@ -177,11 +228,11 @@ fn stmt(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<LVar>>)
     } else if consume("{", token) {
         let mut stmts = Vec::new();
         while !consume("}", token) {
-            stmts.push(stmt(token, lvar));
+            stmts.push(stmt(token, lvar, gvar));
         }
         return new_node_block(stmts);
     }
-    let node = expr(token, lvar);
+    let node = expr(token, lvar, gvar);
     if consume(";", &mut token.borrow_mut()) {
         return node;
     } else {
@@ -196,20 +247,28 @@ fn stmt(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<LVar>>)
 /*
 expr = assign
 */
-fn expr(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<LVar>>) -> Node {
-    return assign(token, lvar);
+fn expr(
+    token: &mut Option<Box<tokenizer::Token>>,
+    lvar: &mut Option<Box<LVar>>,
+    gvar: &mut Option<Box<LVar>>,
+) -> Node {
+    return assign(token, lvar, gvar);
 }
 
 /*
 assign = equality ("=" assign)?
 */
-fn assign(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<LVar>>) -> Node {
-    let node = equality(token, lvar);
+fn assign(
+    token: &mut Option<Box<tokenizer::Token>>,
+    lvar: &mut Option<Box<LVar>>,
+    gvar: &mut Option<Box<LVar>>,
+) -> Node {
+    let node = equality(token, lvar, gvar);
     if consume("=", &mut token.borrow_mut()) {
         return new_node(
             NodeKind::NdAssign,
             Some(Box::new(node)),
-            Some(Box::new(assign(token, lvar))),
+            Some(Box::new(assign(token, lvar, gvar))),
         );
     }
     return node;
@@ -218,21 +277,25 @@ fn assign(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<LVar>
 /*
 equality = relational ("==" relational | "!=" relational)*
 */
-fn equality(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<LVar>>) -> Node {
-    let mut node = relational(token, lvar);
+fn equality(
+    token: &mut Option<Box<tokenizer::Token>>,
+    lvar: &mut Option<Box<LVar>>,
+    gvar: &mut Option<Box<LVar>>,
+) -> Node {
+    let mut node = relational(token, lvar, gvar);
 
     loop {
         if consume("==", &mut token.borrow_mut()) {
             node = new_node(
                 NodeKind::NdEq,
                 Some(Box::new(node)),
-                Some(Box::new(relational(token, lvar))),
+                Some(Box::new(relational(token, lvar, gvar))),
             );
         } else if consume("!=", &mut token.borrow_mut()) {
             node = new_node(
                 NodeKind::NdNe,
                 Some(Box::new(node)),
-                Some(Box::new(relational(token, lvar))),
+                Some(Box::new(relational(token, lvar, gvar))),
             );
         } else {
             return node;
@@ -243,33 +306,37 @@ fn equality(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<LVa
 /*
 relational = add ("<" add | "<=" add | ">" add | ">=" add)*
 */
-fn relational(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<LVar>>) -> Node {
-    let mut node = add(token, lvar);
+fn relational(
+    token: &mut Option<Box<tokenizer::Token>>,
+    lvar: &mut Option<Box<LVar>>,
+    gvar: &mut Option<Box<LVar>>,
+) -> Node {
+    let mut node = add(token, lvar, gvar);
 
     loop {
         if consume("<", &mut token.borrow_mut()) {
             node = new_node(
                 NodeKind::NdLt,
                 Some(Box::new(node)),
-                Some(Box::new(add(token, lvar))),
+                Some(Box::new(add(token, lvar, gvar))),
             );
         } else if consume("<=", &mut token.borrow_mut()) {
             node = new_node(
                 NodeKind::NdLe,
                 Some(Box::new(node)),
-                Some(Box::new(add(token, lvar))),
+                Some(Box::new(add(token, lvar, gvar))),
             );
         } else if consume(">", &mut token.borrow_mut()) {
             node = new_node(
                 NodeKind::NdGt,
                 Some(Box::new(node)),
-                Some(Box::new(add(token, lvar))),
+                Some(Box::new(add(token, lvar, gvar))),
             );
         } else if consume(">=", &mut token.borrow_mut()) {
             node = new_node(
                 NodeKind::NdGe,
                 Some(Box::new(node)),
-                Some(Box::new(add(token, lvar))),
+                Some(Box::new(add(token, lvar, gvar))),
             );
         } else {
             return node;
@@ -280,22 +347,26 @@ fn relational(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<L
 /*
 add = mul ("+" mul | "-" mul)*
 */
-fn add(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<LVar>>) -> Node {
-    let mut node = mul(token, lvar);
+fn add(
+    token: &mut Option<Box<tokenizer::Token>>,
+    lvar: &mut Option<Box<LVar>>,
+    gvar: &mut Option<Box<LVar>>,
+) -> Node {
+    let mut node = mul(token, lvar, gvar);
 
     loop {
         if consume("+", &mut token.borrow_mut()) {
             node = new_node(
                 NodeKind::NdAdd,
                 Some(Box::new(node)),
-                Some(Box::new(mul(token, lvar))),
+                Some(Box::new(mul(token, lvar, gvar))),
             );
             add_type(&mut node);
         } else if consume("-", &mut token.borrow_mut()) {
             node = new_node(
                 NodeKind::NdSub,
                 Some(Box::new(node)),
-                Some(Box::new(mul(token, lvar))),
+                Some(Box::new(mul(token, lvar, gvar))),
             );
             add_type(&mut node);
         } else {
@@ -307,21 +378,25 @@ fn add(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<LVar>>) 
 /*
 mul = unary ("*" unary | "/" unary)*
 */
-fn mul(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<LVar>>) -> Node {
-    let mut node = unary(token, lvar);
+fn mul(
+    token: &mut Option<Box<tokenizer::Token>>,
+    lvar: &mut Option<Box<LVar>>,
+    gvar: &mut Option<Box<LVar>>,
+) -> Node {
+    let mut node = unary(token, lvar, gvar);
 
     loop {
         if consume("*", &mut token.borrow_mut()) {
             node = new_node(
                 NodeKind::NdMul,
                 Some(Box::new(node)),
-                Some(Box::new(unary(token, lvar))),
+                Some(Box::new(unary(token, lvar, gvar))),
             );
         } else if consume("/", &mut token.borrow_mut()) {
             node = new_node(
                 NodeKind::NdDiv,
                 Some(Box::new(node)),
-                Some(Box::new(unary(token, lvar))),
+                Some(Box::new(unary(token, lvar, gvar))),
             );
         } else {
             return node;
@@ -332,19 +407,23 @@ fn mul(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<LVar>>) 
 /*
 unary = "sizeof" unary | ("+" | "-")? primary | "*" unary | "&" unary
 */
-fn unary(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<LVar>>) -> Node {
+fn unary(
+    token: &mut Option<Box<tokenizer::Token>>,
+    lvar: &mut Option<Box<LVar>>,
+    gvar: &mut Option<Box<LVar>>,
+) -> Node {
     if consume("+", &mut token.borrow_mut()) {
-        return primary(token, lvar);
+        return primary(token, lvar, gvar);
     }
     if consume("-", &mut token.borrow_mut()) {
         return new_node(
             NodeKind::NdNeg,
             Some(Box::new(new_node_num(0))),
-            Some(Box::new(primary(token, lvar))),
+            Some(Box::new(primary(token, lvar, gvar))),
         );
     }
     if consume_kind(tokenizer::TokenKind::TkSizeof, token) {
-        let mut node = unary(token, lvar);
+        let mut node = unary(token, lvar, gvar);
         add_type(&mut node);
         if let Some(ty) = node.var_type {
             return new_node_num(ty.size as i32);
@@ -353,23 +432,34 @@ fn unary(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<LVar>>
         }
     }
     if consume("*", &mut token.borrow_mut()) {
-        let mut new_deref_node =
-            new_node(NodeKind::NdDeref, None, Some(Box::new(unary(token, lvar))));
+        let mut new_deref_node = new_node(
+            NodeKind::NdDeref,
+            None,
+            Some(Box::new(unary(token, lvar, gvar))),
+        );
         add_type(&mut new_deref_node);
         return new_deref_node;
     }
     if consume("&", &mut token.borrow_mut()) {
-        return new_node(NodeKind::NdAddr, None, Some(Box::new(unary(token, lvar))));
+        return new_node(
+            NodeKind::NdAddr,
+            None,
+            Some(Box::new(unary(token, lvar, gvar))),
+        );
     }
-    primary(token, lvar)
+    primary(token, lvar, gvar)
 }
 
 /*
 primary = num | ident | ident "(" expr ")" | ident "[" expr "]"
 */
-fn primary(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<LVar>>) -> Node {
+fn primary(
+    token: &mut Option<Box<tokenizer::Token>>,
+    lvar: &mut Option<Box<LVar>>,
+    gvar: &mut Option<Box<LVar>>,
+) -> Node {
     if consume("(", &mut token.borrow_mut()) {
-        let node = expr(token, lvar);
+        let node = expr(token, lvar, gvar);
         expect(")", &mut token.borrow_mut());
         return node;
     }
@@ -383,17 +473,17 @@ fn primary(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<LVar
             if consume("(", &mut token.borrow_mut()) {
                 let mut args = Vec::new();
                 if !consume(")", &mut token.borrow_mut()) {
-                    args.push(expr(token, lvar));
+                    args.push(expr(token, lvar, gvar));
                     while consume(",", &mut token.borrow_mut()) {
-                        args.push(expr(token, lvar));
+                        args.push(expr(token, lvar, gvar));
                     }
                     expect(")", &mut token.borrow_mut());
                 }
                 return new_node_func(ident, args);
             } else if consume("[", &mut token.borrow_mut()) {
-                let node = expr(token, lvar);
+                let node = expr(token, lvar, gvar);
                 expect("]", &mut token.borrow_mut());
-                let array_node = new_node_lvar(ident, lvar);
+                let array_node = new_node_lvar(ident, lvar, gvar);
                 let add_node = new_node(
                     NodeKind::NdAdd,
                     Some(Box::new(array_node)),
@@ -402,7 +492,7 @@ fn primary(token: &mut Option<Box<tokenizer::Token>>, lvar: &mut Option<Box<LVar
                 return new_node(NodeKind::NdDeref, None, Some(Box::new(add_node)));
             }
 
-            return new_node_lvar(ident, lvar);
+            return new_node_lvar(ident, lvar, gvar);
         }
         error("expected number or ident");
     } else {

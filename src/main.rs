@@ -20,11 +20,19 @@ fn main() {
 
     let tokens = &args[1][..];
     let token = Rc::new(RefCell::new(tokenizer::tokenizer(tokens)));
-    let codes = parser::program(&mut token.borrow_mut());
+    let (codes, mut gvar) = parser::program(&mut token.borrow_mut());
 
     println!(".intel_syntax noprefix");
-    println!(".globl main");
 
+    println!(".section .data");
+    while let Some(current) = &gvar {
+        println!("{}:", current.name);
+        println!("  .zero {}", current.offset);
+        gvar = current.next.clone();
+    }
+
+    println!(".section .text");
+    println!(".globl main");
     for (args, code, offset, function_name) in codes {
         println!("{}:", function_name);
         println!("  push rbp");

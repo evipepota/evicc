@@ -5,30 +5,32 @@ use crate::util::{error, find_lvar};
 
 #[derive(Clone, Debug)]
 pub enum NodeKind {
-    NdAdd,    // +
-    NdSub,    // -
-    NdMul,    // *
-    NdDiv,    // /
-    NdNeg,    // unary -
-    NdEq,     // ==
-    NdNe,     // !=
-    NdGt,     // >
-    NdGe,     // >=
-    NdLt,     // <
-    NdLe,     // <=
-    NdAssign, // =
-    NdDeref,  // *
-    NdAddr,   // &
-    NdNum,    // Integer
-    NdLvar,   // Local variable
-    NdReturn, // Return
-    NdIf,     // If
-    NdElse,   // Else
-    NdWhile,  // While
-    NdFor,    // For
-    NdBlock,  // Block
-    NdFunc,   // Function
-    NdVardef, // Variable definition
+    NdAdd,     // +
+    NdSub,     // -
+    NdMul,     // *
+    NdDiv,     // /
+    NdNeg,     // unary -
+    NdEq,      // ==
+    NdNe,      // !=
+    NdGt,      // >
+    NdGe,      // >=
+    NdLt,      // <
+    NdLe,      // <=
+    NdAssign,  // =
+    NdDeref,   // *
+    NdAddr,    // &
+    NdNum,     // Integer
+    NdLvar,    // Local variable
+    NdGvar,    // Global variable
+    NdReturn,  // Return
+    NdIf,      // If
+    NdElse,    // Else
+    NdWhile,   // While
+    NdFor,     // For
+    NdBlock,   // Block
+    NdFunc,    // Function
+    NdVardef,  // Variable definition
+    NdGVardef, // Global variable definition
 }
 
 #[derive(Clone, Debug)]
@@ -85,12 +87,30 @@ pub fn new_node_func(name: String, args: Vec<Node>) -> Node {
     }
 }
 
-pub fn new_node_lvar(name: String, lvar: &mut Option<Box<LVar>>) -> Node {
+pub fn new_node_lvar(
+    name: String,
+    lvar: &mut Option<Box<LVar>>,
+    gvar: &mut Option<Box<LVar>>,
+) -> Node {
     let lvar = if let Some(lvar) = find_lvar(lvar, &name) {
         *lvar
     } else {
-        println!("{}", name);
-        error("not declared variable");
+        // global variable
+        if let Some(gvar) = find_lvar(gvar, &name) {
+            return Node {
+                kind: NodeKind::NdGvar,
+                lhs: None,
+                rhs: None,
+                name,
+                val: 0,
+                offset: gvar.offset,
+                var_type: Some(Box::new(gvar.ty.clone())),
+                stmts: Vec::new(),
+            };
+        } else {
+            println!("{}", name);
+            error("not declared variable");
+        }
     };
 
     let node_type = lvar.ty.clone();
@@ -103,6 +123,70 @@ pub fn new_node_lvar(name: String, lvar: &mut Option<Box<LVar>>) -> Node {
         val: 0,
         offset: lvar.offset,
         var_type: Some(Box::new(node_type)),
+        stmts: Vec::new(),
+    }
+}
+
+pub fn new_node_gvar_def(name: String, depth_pointer: usize, gvar: &mut Option<Box<LVar>>) -> Node {
+    let mut node_type = new_type_int();
+    for _ in 0..depth_pointer {
+        node_type = new_type_ptr(node_type);
+    }
+
+    let offset = if let Some(_) = find_lvar(gvar, &name) {
+        error("variable already declared");
+    } else {
+        node_type.clone().unwrap().size as i32
+    };
+
+    *gvar = Some(Box::new(LVar::new(
+        gvar.take(),
+        name.clone(),
+        offset,
+        node_type.clone().unwrap().as_ref().clone(),
+    )));
+
+    Node {
+        kind: NodeKind::NdGVardef,
+        lhs: None,
+        rhs: None,
+        name,
+        val: 0,
+        offset,
+        var_type: node_type,
+        stmts: Vec::new(),
+    }
+}
+
+pub fn new_node_gvar_def_array(
+    name: String,
+    size: i32,
+    gvar: &mut Option<Box<LVar>>,
+    ty: TypeKind,
+) -> Node {
+    let offset = if let Some(_) = find_lvar(gvar, &name) {
+        error("variable already declared");
+    } else {
+        size * ty.size()
+    };
+
+    let node_type = new_type_array(new_type_int(), size as usize);
+
+    *gvar = Some(Box::new(LVar::new(
+        gvar.take(),
+        name.clone(),
+        offset,
+        node_type.clone().unwrap().as_ref().clone(),
+    )));
+
+    Node {
+        kind: NodeKind::NdGVardef,
+        lhs: None,
+        rhs: None,
+        name,
+        val: 0,
+        offset,
+        var_type: node_type,
         stmts: Vec::new(),
     }
 }

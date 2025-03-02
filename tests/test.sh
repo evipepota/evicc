@@ -113,4 +113,10 @@ assert 4 'int main(){int a[3];a[0] = 3;a[2] = 1;return a[0]+a[2];}'
 assert 3 'int main(){int a[3];int b;b=1;a[b] = 3;return a[1];}'
 assert 5 'int main(){int a[3];int b;b=1;a[4-3]=2;a[b+1] = 3;return a[2]+a[1];}'
 
+assert 3 'int a; int main(){a = 3; return a;}'
+assert 3 'int a; int main(){a = 3; int b; b = a; return b;}'
+assert 5 'int a; int add(int b){return a+b;} int main(){a = 3; return add(2);}'
+assert 5 'int a[3]; int add(int b){return a[0]+b;} int main(){a[0] = 3; return add(2);}'
+assert 5 'int a[3]; int add(int b){return a[1]+b;} int main(){a[1] = 3; int *p;p=a;return add(2);}'
+
 echo OK

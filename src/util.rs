@@ -26,6 +26,15 @@ pub fn error_at(loc: usize, msg: &str) -> ! {
     process::exit(1);
 }
 
+pub fn check(op: &str, token: &Option<Box<Token>>) -> bool {
+    if let Some(current) = token {
+        if let TokenKind::TkReserved = current.kind {
+            return current.str == op;
+        }
+    }
+    false
+}
+
 pub fn consume(op: &str, token: &mut Option<Box<Token>>) -> bool {
     if let Some(current) = token {
         if let TokenKind::TkReserved = current.kind {

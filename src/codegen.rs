@@ -35,9 +35,19 @@ pub fn gen_lval(node: Node) {
         println!("  push rax");
         return;
     }
+    if let NodeKind::NdGvar = node.kind {
+        println!("  lea rax, {}[rip]", node.name);
+        println!("  push rax");
+        return;
+    }
     if let NodeKind::NdVardef = node.kind {
         println!("  mov rax, rbp");
         println!("  sub rax, {}", node.offset);
+        println!("  push rax");
+        return;
+    }
+    if let NodeKind::NdGVardef = node.kind {
+        println!("  lea rax, {}[rip]", node.name);
         println!("  push rax");
         return;
     }
@@ -61,7 +71,18 @@ pub fn gen(node: Node) {
             load(node);
             return;
         }
+        NodeKind::NdGvar => {
+            gen_lval(node.clone());
+
+            load(node);
+            return;
+        }
         NodeKind::NdVardef => {
+            gen_lval(node.clone());
+
+            return;
+        }
+        NodeKind::NdGVardef => {
             gen_lval(node.clone());
 
             return;
